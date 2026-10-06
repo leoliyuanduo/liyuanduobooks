@@ -1,25 +1,59 @@
 # Book Library: Bupa coding challenge
 
-A React + TypeScript application that fetches book owners from the Bupa coding-test API and lists every book alphabetically, grouped by the owner's age category (**Adults** 18+, **Children** 17 and under), with a **Hardcover only** filter.
+Lists every book from the Bupa coding-test API alphabetically, grouped by the owner's age category (**Adults** 18+, **Children** 17 and under), with a **Hardcover only** filter.
 
 | Desktop (≥ 600px)                                                      | Mobile (< 600px)                                        |
 | ---------------------------------------------------------------------- | ------------------------------------------------------- |
 | ![Desktop, hardcover filter](docs/screenshots/desktop-2-hardcover.png) | ![Mobile, all books](docs/screenshots/mobile-1-all.png) |
 
+## Repository layout
+
+```
+api/    ASP.NET Core (.NET 10) backend-for-frontend: owns the business rules, calls the Bupa API
+web/    React + TypeScript client
+docs/   Architecture decision records (docs/adr) and screenshots
+```
+
+> **Status:** the BFF (`api/`) is built and tested on its own. The React client still calls the upstream API through the Vite proxy and applies the rules itself. Switching it to `GET /api/v1/books` (with types generated from the BFF's OpenAPI document) is the next step.
+
 ## Quick start
 
-Requires Node.js 20.19+ (see `.nvmrc`).
+### API (`api/`)
+
+Requires the .NET 10 SDK.
 
 ```bash
+cd api
+dotnet build                                      # also regenerates src/BupaBooks.Host/openapi/bupa-books.json
+dotnet test --filter "Category!=LiveContract"     # unit, integration and architecture tests (offline)
+dotnet test --filter "Category=LiveContract"      # checks the real Bupa API still matches our expectations
+dotnet run --project src/BupaBooks.Host           # http://localhost:5080 (API reference at /scalar/v1)
+```
+
+Try `GET http://localhost:5080/api/v1/books?ageCategory=child&format=hardcover`, or use `src/BupaBooks.Host/BupaBooks.Host.http`.
+
+### Web (`web/`)
+
+Requires Node.js 20.19+ (see `web/.nvmrc`).
+
+```bash
+cd web
 npm ci
 npm run dev        # http://localhost:5173, with /api proxied to the upstream API
 npm test           # unit + integration tests
 npm run ci         # everything CI runs: format, lint, typecheck, coverage gate, build
 ```
 
-Configuration goes in `.env.local` (see `.env.example`). No secrets are needed.
+Configuration goes in `web/.env.local` (see `web/.env.example`). No secrets are needed.
 
-## How the requirements map to the code
+## BFF design at a glance
+
+- **Endpoint:** `GET /api/v1/books?ageCategory=adult|child&format=hardcover|paperback|ebook&limit=&cursor=` returns `{ items: [{ id, title, format }], page: { limit, nextCursor, totalCount } }`. No owner data leaves the server. ([ADR-0004](docs/adr/0004-bff-api-contract.md))
+- **Clean architecture in three projects:** Host → Application (domain model + use case + port) ← Infrastructure (HTTP client, resilience, cache, anti-corruption mapping). Layer rules are enforced by architecture tests. ([ADR-0005](docs/adr/0005-bff-clean-architecture.md))
+- **Reliability:** standard resilience pipeline (retry on transient errors, timeouts, circuit breaker), `HybridCache` with stampede protection, ETag/304 support, RFC 9457 problem details with `traceId`, upstream failures mapped to 502/503/504.
+- **Observability:** source-generated structured logs (no personal data), correlation id, OpenTelemetry traces and metrics (OTLP export when configured), liveness and readiness endpoints.
+
+## How the requirements map to the code (web client)
 
 | Requirement                       | Where it lives                                              | Verified by                                                  |
 | --------------------------------- | ----------------------------------------------------------- | ------------------------------------------------------------ |
