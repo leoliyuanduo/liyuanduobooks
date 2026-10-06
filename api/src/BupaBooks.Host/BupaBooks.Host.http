@@ -1,0 +1,17 @@
+@host = http://localhost:5080
+
+### All adult books
+GET {{host}}/api/v1/books?ageCategory=adult
+Accept: application/json
+
+### Hardcover books owned by children
+GET {{host}}/api/v1/books?ageCategory=child&format=hardcover
+
+### Paging: 2 per page (follow page.nextCursor)
+GET {{host}}/api/v1/books?ageCategory=adult&limit=2
+
+### Validation errors (400 problem details listing every error)
+GET {{host}}/api/v1/books?ageCategory=teen&format=audiobook&limit=500
+
+### Health
+GET {{host}}/health/live
