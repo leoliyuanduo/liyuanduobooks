@@ -1,0 +1,13 @@
+<Solution>
+  <Folder Name="/src/">
+    <Project Path="src/BupaBooks.Application/BupaBooks.Application.csproj" />
+    <Project Path="src/BupaBooks.Infrastructure/BupaBooks.Infrastructure.csproj" />
+    <Project Path="src/BupaBooks.Host/BupaBooks.Host.csproj" />
+  </Folder>
+  <Folder Name="/tests/">
+    <Project Path="tests/BupaBooks.Application.UnitTests/BupaBooks.Application.UnitTests.csproj" />
+    <Project Path="tests/BupaBooks.Infrastructure.Tests/BupaBooks.Infrastructure.Tests.csproj" />
+    <Project Path="tests/BupaBooks.Host.IntegrationTests/BupaBooks.Host.IntegrationTests.csproj" />
+    <Project Path="tests/BupaBooks.ArchitectureTests/BupaBooks.ArchitectureTests.csproj" />
+  </Folder>
+</Solution>
