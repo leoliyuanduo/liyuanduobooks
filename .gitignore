@@ -27,3 +27,10 @@ coverage
 .env
 .env.*
 !.env.example
+
+# .NET
+bin/
+obj/
+*.user
+.vs/
+TestResults/
