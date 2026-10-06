@@ -1,0 +1,29 @@
+name: Upstream contract check
+
+# The Bupa API publishes no response schema, so we check the live endpoint
+# against our expectations on a schedule. A failure means upstream changed shape:
+# investigate before users notice.
+on:
+  schedule:
+    - cron: '17 21 * * *' # daily, ~08:17 Sydney time
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  live-contract:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    defaults:
+      run:
+        working-directory: api
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          global-json-file: api/global.json
+
+      - name: Run live contract tests
+        run: dotnet test tests/BupaBooks.Infrastructure.Tests --filter "Category=LiveContract"
