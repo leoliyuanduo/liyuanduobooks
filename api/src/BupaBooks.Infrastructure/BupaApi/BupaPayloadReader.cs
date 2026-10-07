@@ -1,4 +1,5 @@
 using System.Text.Json;
+using System.Text.Json.Serialization;
 using BupaBooks.Application.Abstractions;
 using BupaBooks.Infrastructure.BupaApi.Dtos;
 using Microsoft.Extensions.Logging;
@@ -13,7 +14,13 @@ namespace BupaBooks.Infrastructure.BupaApi;
 /// </summary>
 internal static class BupaPayloadReader
 {
-    private static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web);
+    // Web defaults (camelCase, case-insensitive) but STRICT numbers: the Web defaults also set
+    // AllowReadingFromString, which silently accepted "age": "30". A type change upstream is
+    // contract drift we want to see (and reject), not paper over.
+    private static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web)
+    {
+        NumberHandling = JsonNumberHandling.Strict,
+    };
 
     public static BupaBookOwnerDto[] Read(JsonElement root, ILogger logger)
     {
