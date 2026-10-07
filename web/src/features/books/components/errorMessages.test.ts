@@ -13,6 +13,7 @@ describe('describeError', () => {
   });
 
   it.each<[number | undefined, RegExp]>([
+    [429, /too many requests/i],
     [503, /temporarily unavailable/],
     [504, /too long/],
     [502, /provider returned an error/],

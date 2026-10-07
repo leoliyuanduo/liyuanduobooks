@@ -74,7 +74,13 @@ BupaBooks.Host ─────────► BupaBooks.Application ◄───
 
 - **The server owns every business rule.** The client sends intent (`ageCategory=adult&format=hardcover`); it never sees an age.
 - **No personal data leaves the server.** Responses contain `{ id, title, format }` only.
-- **Reliability:** retries with backoff for 429/5xx/timeouts and for upstream's empty `200` responses ([ADR-0006](docs/adr/0006-upstream-behaviour.md)), circuit breaker, a 5-minute `HybridCache` with stampede protection (one upstream call however many users arrive at once), ETag/304, and errors as RFC 9457 problem details with a `traceId` (`502`/`503` + `Retry-After`/`504`).
+- **Reliability, no cascading failure** ([ADR-0006](docs/adr/0006-upstream-behaviour.md), [ADR-0007](docs/adr/0007-edge-protection-and-cascading-failure.md)):
+  - Retries with backoff and jitter for 429/5xx/timeouts and for upstream's empty `200` responses.
+  - A bulkhead (at most 10 concurrent upstream calls) and a circuit breaker tuned to actually trip at this traffic.
+  - A 5-minute `HybridCache` with stampede protection: one upstream call however many users arrive at once.
+  - A **last-known-good fallback**: during an outage, users get data up to an hour old instead of an error.
+  - ETag/304, and errors as RFC 9457 problem details with a `traceId` (`429`/`502`/`503` + `Retry-After`/`504`).
+- **Edge protection:** a per-client-IP rate limit (token bucket, `429` + `Retry-After`) that only trusts forwarded headers from known proxies, a 15 s request timeout, strict CSP and security headers, no `Server` header, HSTS outside development, and Brotli/gzip compression.
 - **Boundaries are enforced by tests**, not convention: `ArchitectureTests` fail the build if the domain depends on anything else, or if Host code (other than `Program.cs`) uses Infrastructure.
 
 ### Client (`web/`)
@@ -128,12 +134,12 @@ All in [`docs/adr`](docs/adr):
 
 - Serve the React build from the BFF (`wwwroot`, already wired with an SPA fallback) as one container, behind Azure Front Door/APIM with WAF.
 - Add **OAuth2/OIDC** (Entra ID) if the data is not public: the endpoint group is ready for `.RequireAuthorization()`.
-- Security headers: strict **CSP**, HSTS, `X-Content-Type-Options`, `Referrer-Policy`, `frame-ancestors 'none'`. Add server-side rate limiting per client.
+- With more than one instance, move per-client rate limiting to the gateway (or a distributed limiter), and set `ForwardedHeaders:KnownProxies` to the gateway's addresses.
 - Add CodeQL scanning; pin GitHub Actions to commit SHAs.
 
 **Reliability and operations**
 
-- Point the OpenTelemetry exporter at Application Insights; alert on the `recordSkipped` and upstream-failure log events and on 5xx rates.
+- Point the OpenTelemetry exporter at Application Insights; alert on the skipped-record, upstream-failure and stale-data log events (1001 to 1005), on 429 rates and on 5xx rates.
 - Use a distributed cache (Redis) behind `HybridCache` when running more than one instance.
 - Synthetic availability check against the deployed site; the scheduled upstream contract test already covers Bupa's side.
 

@@ -25,6 +25,8 @@ export function describeError(error: Error): string {
 
 function describeStatus(status: number | undefined): string {
   switch (status) {
+    case 429:
+      return 'Too many requests. Please wait a moment and try again.';
     case 503:
       return 'The book service is temporarily unavailable. Please try again shortly.';
     case 504:
