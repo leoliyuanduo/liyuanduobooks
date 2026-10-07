@@ -50,4 +50,33 @@ public class HostPipelineTests(BooksApiFactory factory) : IClassFixture<BooksApi
 
         document.GetProperty("paths").TryGetProperty("/api/v1/books", out _).ShouldBeTrue();
     }
+
+    [Fact]
+    public async Task OpenApi_publishes_the_real_query_contract_for_client_code_generation()
+    {
+        var document = JsonDocument.Parse(await _client.GetStringAsync("/openapi/v1.json")).RootElement;
+        var parameters = document.GetProperty("paths").GetProperty("/api/v1/books").GetProperty("get")
+            .GetProperty("parameters").EnumerateArray()
+            .ToDictionary(parameter => parameter.GetProperty("name").GetString()!);
+
+        var ageCategory = parameters["ageCategory"];
+        ageCategory.GetProperty("required").GetBoolean().ShouldBeTrue();
+        ageCategory.GetProperty("schema").GetProperty("enum").EnumerateArray()
+            .Select(value => value.GetString()).ShouldBe(["adult", "child"]);
+
+        parameters["format"].GetProperty("schema").GetProperty("enum").EnumerateArray()
+            .Select(value => value.GetString()).ShouldBe(["hardcover", "paperback", "ebook"]);
+
+        parameters["limit"].GetProperty("schema").GetProperty("type").GetString().ShouldBe("integer");
+    }
+
+    [Fact]
+    public async Task OpenApi_types_page_numbers_as_integers_only()
+    {
+        var document = JsonDocument.Parse(await _client.GetStringAsync("/openapi/v1.json")).RootElement;
+        var totalCount = document.GetProperty("components").GetProperty("schemas")
+            .GetProperty("PageInfo").GetProperty("properties").GetProperty("totalCount");
+
+        totalCount.GetProperty("type").GetString().ShouldBe("integer");
+    }
 }

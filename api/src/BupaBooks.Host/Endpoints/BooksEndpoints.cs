@@ -1,6 +1,7 @@
 using BupaBooks.Application.Books.GetBooks;
 using BupaBooks.Host.Contracts;
 using BupaBooks.Host.Http;
+using BupaBooks.Host.ApiDocs;
 using Microsoft.AspNetCore.Http.HttpResults;
 using Microsoft.Extensions.Options;
 using HttpJsonOptions = Microsoft.AspNetCore.Http.Json.JsonOptions;
@@ -18,7 +19,7 @@ public static class BooksEndpoints
         var group = app.MapGroup("/api/v1/books").WithTags("Books");
 
         group.MapGet("", GetBooksAsync)
-            .WithName("GetBooks")
+            .WithName(GetBooksOperationTransformer.OperationId)
             .WithSummary("List books owned by an age category")
             .WithDescription(
                 "Returns books owned by adults (18+) or children (17 and under), optionally filtered by format, " +

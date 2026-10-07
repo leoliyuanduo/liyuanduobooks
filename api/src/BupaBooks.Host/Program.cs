@@ -5,8 +5,10 @@ using BupaBooks.Application;
 using BupaBooks.Host.Endpoints;
 using BupaBooks.Host.ErrorHandling;
 using BupaBooks.Host.Http;
+using BupaBooks.Host.ApiDocs;
 using BupaBooks.Infrastructure;
 using Microsoft.AspNetCore.Diagnostics.HealthChecks;
+using Microsoft.OpenApi;
 using OpenTelemetry;
 using OpenTelemetry.Metrics;
 using OpenTelemetry.Resources;
@@ -20,8 +22,12 @@ builder.Services.AddApplication();
 builder.Services.AddInfrastructure(builder.Configuration);
 
 // Enums travel as camelCase strings ("hardcover"), which is also what the OpenAPI schema advertises.
+// Strict number handling: numbers are numbers, so the schema says "integer" rather than "integer | string".
 builder.Services.ConfigureHttpJsonOptions(options =>
-    options.SerializerOptions.Converters.Add(new JsonStringEnumConverter(JsonNamingPolicy.CamelCase)));
+{
+    options.SerializerOptions.Converters.Add(new JsonStringEnumConverter(JsonNamingPolicy.CamelCase));
+    options.SerializerOptions.NumberHandling = JsonNumberHandling.Strict;
+});
 
 // RFC 9457 problem details for every error, each carrying a traceId to find it in the logs.
 builder.Services.AddProblemDetails(options =>
@@ -30,7 +36,21 @@ builder.Services.AddProblemDetails(options =>
             Activity.Current?.TraceId.ToString() ?? context.HttpContext.TraceIdentifier);
 builder.Services.AddExceptionHandler<BookSourceExceptionHandler>();
 
-builder.Services.AddOpenApi();
+builder.Services.AddOpenApi(options =>
+{
+    options.AddDocumentTransformer((document, _, _) =>
+    {
+        document.Info = new OpenApiInfo
+        {
+            Title = "Bupa Books BFF",
+            Version = "v1",
+            Description = "Backend for the Owners and Books app. Applies the business rules (age categories, " +
+                          "format filter, alphabetical order) to data from the Bupa coding-test API.",
+        };
+        return Task.CompletedTask;
+    });
+    options.AddOperationTransformer<GetBooksOperationTransformer>();
+});
 builder.Services.AddHealthChecks();
 
 // Traces and metrics for inbound requests and the upstream HttpClient. Exported over OTLP
