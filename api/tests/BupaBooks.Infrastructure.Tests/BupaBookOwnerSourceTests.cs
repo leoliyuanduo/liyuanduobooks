@@ -88,6 +88,39 @@ public class BupaBookOwnerSourceTests
     }
 
     [Fact]
+    public async Task Empty_upstream_responses_are_retried()
+    {
+        // Observed behaviour of the real API: intermittent 200 OK with an empty body.
+        var attempt = 0;
+        var upstream = new StubHttpHandler((_, _) => Task.FromResult(
+            Interlocked.Increment(ref attempt) <= 2
+                ? StubHttpHandler.JsonResponse(string.Empty)
+                : StubHttpHandler.JsonResponse(TestData.LivePayload())));
+        await using var services = BuildServices(upstream);
+
+        var owners = await services.GetRequiredService<IBookOwnerSource>().GetOwnersAsync(CancellationToken.None);
+
+        owners.Count.ShouldBe(5);
+        upstream.Calls.ShouldBe(3);
+    }
+
+    [Fact]
+    public async Task Rate_limited_responses_are_retried()
+    {
+        var attempt = 0;
+        var upstream = new StubHttpHandler((_, _) => Task.FromResult(
+            Interlocked.Increment(ref attempt) == 1
+                ? StubHttpHandler.JsonResponse("\"Too many requests\"", HttpStatusCode.TooManyRequests)
+                : StubHttpHandler.JsonResponse(TestData.LivePayload())));
+        await using var services = BuildServices(upstream);
+
+        var owners = await services.GetRequiredService<IBookOwnerSource>().GetOwnersAsync(CancellationToken.None);
+
+        owners.Count.ShouldBe(5);
+        upstream.Calls.ShouldBe(2);
+    }
+
+    [Fact]
     public async Task Failures_are_not_cached()
     {
         var attempt = 0;
