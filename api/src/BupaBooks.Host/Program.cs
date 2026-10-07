@@ -1,13 +1,19 @@
 using System.Diagnostics;
+using System.Net;
 using System.Text.Json;
 using System.Text.Json.Serialization;
 using BupaBooks.Application;
 using BupaBooks.Host.Endpoints;
 using BupaBooks.Host.ErrorHandling;
 using BupaBooks.Host.Http;
+using BupaBooks.Host.RateLimiting;
+using BupaBooks.Host.Security;
 using BupaBooks.Host.ApiDocs;
 using BupaBooks.Infrastructure;
 using Microsoft.AspNetCore.Diagnostics.HealthChecks;
+using Microsoft.AspNetCore.HttpOverrides;
+using Microsoft.AspNetCore.Http.Timeouts;
+using Microsoft.AspNetCore.ResponseCompression;
 using Microsoft.OpenApi;
 using OpenTelemetry;
 using OpenTelemetry.Metrics;
@@ -16,6 +22,9 @@ using OpenTelemetry.Trace;
 using Scalar.AspNetCore;
 
 var builder = WebApplication.CreateBuilder(args);
+
+// Do not advertise the server technology.
+builder.WebHost.ConfigureKestrel(kestrel => kestrel.AddServerHeader = false);
 
 // ---- Composition root: the only place that knows every layer. ----
 builder.Services.AddApplication();
@@ -35,6 +44,41 @@ builder.Services.AddProblemDetails(options =>
         context.ProblemDetails.Extensions["traceId"] =
             Activity.Current?.TraceId.ToString() ?? context.HttpContext.TraceIdentifier);
 builder.Services.AddExceptionHandler<BookSourceExceptionHandler>();
+
+// ---- Edge protection: who is calling, how often, and for how long. ----
+
+// Behind a reverse proxy (Front Door, App Gateway, nginx) the client IP arrives in
+// X-Forwarded-For. Only proxies listed in ForwardedHeaders:KnownProxies are trusted;
+// otherwise any caller could spoof the header and dodge the per-IP rate limit.
+builder.Services.Configure<ForwardedHeadersOptions>(options =>
+{
+    options.ForwardedHeaders = ForwardedHeaders.XForwardedFor | ForwardedHeaders.XForwardedProto;
+    options.ForwardLimit = 1;
+    foreach (var proxy in builder.Configuration.GetSection("ForwardedHeaders:KnownProxies").Get<string[]>() ?? [])
+    {
+        options.KnownProxies.Add(IPAddress.Parse(proxy));
+    }
+});
+
+builder.Services.AddClientIpRateLimiting(builder.Configuration);
+
+// Bound every request's lifetime so slow work cannot pile up and exhaust the server.
+// 15 s is above the upstream budget (10 s incl. retries), so upstream errors surface first.
+builder.Services.AddRequestTimeouts(options => options.DefaultPolicy = new RequestTimeoutPolicy
+{
+    Timeout = TimeSpan.FromSeconds(15),
+    TimeoutStatusCode = StatusCodes.Status504GatewayTimeout,
+});
+
+// Brotli/gzip for JSON and the React bundle. Enabled over HTTPS deliberately: responses
+// carry no secrets or reflected user input, so compression side channels (BREACH) do not apply.
+builder.Services.AddResponseCompression(options =>
+{
+    options.EnableForHttps = true;
+    options.Providers.Add<BrotliCompressionProvider>();
+    options.Providers.Add<GzipCompressionProvider>();
+    options.MimeTypes = ResponseCompressionDefaults.MimeTypes.Concat(["application/problem+json"]);
+});
 
 builder.Services.AddOpenApi(options =>
 {
@@ -67,9 +111,21 @@ if (!string.IsNullOrWhiteSpace(builder.Configuration["OTEL_EXPORTER_OTLP_ENDPOIN
 var app = builder.Build();
 
 // ---- HTTP pipeline (order matters). ----
+app.UseForwardedHeaders(); // first: everything after sees the real client IP and scheme
 app.UseMiddleware<CorrelationIdMiddleware>();
 app.UseExceptionHandler();
 app.UseStatusCodePages();
+
+if (!app.Environment.IsDevelopment())
+{
+    app.UseHsts();
+    app.UseHttpsRedirection();
+}
+
+app.UseMiddleware<SecurityHeadersMiddleware>();
+app.UseResponseCompression();
+app.UseRateLimiter();
+app.UseRequestTimeouts();
 
 app.MapOpenApi();
 if (app.Environment.IsDevelopment())

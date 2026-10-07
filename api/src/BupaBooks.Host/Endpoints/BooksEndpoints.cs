@@ -1,6 +1,7 @@
 using BupaBooks.Application.Books.GetBooks;
 using BupaBooks.Host.Contracts;
 using BupaBooks.Host.Http;
+using BupaBooks.Host.RateLimiting;
 using BupaBooks.Host.ApiDocs;
 using Microsoft.AspNetCore.Http.HttpResults;
 using Microsoft.Extensions.Options;
@@ -16,7 +17,9 @@ public static class BooksEndpoints
 {
     public static IEndpointRouteBuilder MapBooksEndpoints(this IEndpointRouteBuilder app)
     {
-        var group = app.MapGroup("/api/v1/books").WithTags("Books");
+        var group = app.MapGroup("/api/v1/books")
+            .WithTags("Books")
+            .RequireRateLimiting(RateLimitingSetup.PerClientIpPolicy);
 
         group.MapGet("", GetBooksAsync)
             .WithName(GetBooksOperationTransformer.OperationId)
@@ -24,6 +27,7 @@ public static class BooksEndpoints
             .WithDescription(
                 "Returns books owned by adults (18+) or children (17 and under), optionally filtered by format, " +
                 "sorted alphabetically by title (case-insensitive, then by id). Supports cursor paging and ETags.")
+            .ProducesProblem(StatusCodes.Status429TooManyRequests)
             .ProducesProblem(StatusCodes.Status502BadGateway)
             .ProducesProblem(StatusCodes.Status503ServiceUnavailable)
             .ProducesProblem(StatusCodes.Status504GatewayTimeout);
