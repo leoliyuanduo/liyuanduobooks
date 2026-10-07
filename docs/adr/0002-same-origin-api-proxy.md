@@ -1,6 +1,6 @@
 # ADR-0002: Call the API through a same-origin `/api` path
 
-- **Status:** Accepted
+- **Status:** Accepted, amended 2026-10-07: `/api` now goes to our own BFF (`api/`), not to the Bupa API (see ADR-0004)
 - **Date:** 2026-10-06
 
 ## Context

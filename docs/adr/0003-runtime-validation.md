@@ -1,6 +1,6 @@
 # ADR-0003: Validate API responses at runtime, tolerating bad records
 
-- **Status:** Accepted
+- **Status:** Accepted, amended 2026-10-07: the same policy now runs in the BFF (`BupaPayloadReader`), where untrusted data enters. The client trusts its own server and uses generated types instead of zod.
 - **Date:** 2026-10-06
 
 ## Context

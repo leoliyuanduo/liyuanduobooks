@@ -1,164 +1,151 @@
-# Book Library: Bupa coding challenge
+# Owners and Books: Bupa coding challenge
 
-Lists every book from the Bupa coding-test API alphabetically, grouped by the owner's age category (**Adults** 18+, **Children** 17 and under), with a **Hardcover only** filter.
+A React app with its own server. The **server** (an ASP.NET Core BFF) fetches the Bupa book-owner API and applies the business rules. The **client** (React + TypeScript) fetches from that server and shows every book alphabetically under the age category of its owner (**Adults** 18+, **Children** 17 and under), with a **Hardcover only** view.
 
-| Desktop (≥ 600px)                                                      | Mobile (< 600px)                                        |
-| ---------------------------------------------------------------------- | ------------------------------------------------------- |
-| ![Desktop, hardcover filter](docs/screenshots/desktop-2-hardcover.png) | ![Mobile, all books](docs/screenshots/mobile-1-all.png) |
+| Desktop (≥ 600px)                                         | Mobile (< 600px)                                                   |
+| --------------------------------------------------------- | ------------------------------------------------------------------ |
+| ![Desktop, all books](docs/screenshots/desktop-1-all.png) | ![Mobile, hardcover only](docs/screenshots/mobile-2-hardcover.png) |
 
 ## Repository layout
 
 ```
-api/    ASP.NET Core (.NET 10) backend-for-frontend: owns the business rules, calls the Bupa API
-web/    React + TypeScript client
+api/    ASP.NET Core (.NET 10) server: business rules, resilience, caching, OpenAPI contract
+web/    React + TypeScript client: fetches from api/, types generated from its OpenAPI document
 docs/   Architecture decision records (docs/adr) and screenshots
 ```
 
-> **Status:** the BFF (`api/`) is built and tested on its own. The React client still calls the upstream API through the Vite proxy and applies the rules itself. Switching it to `GET /api/v1/books` (with types generated from the BFF's OpenAPI document) is the next step.
+```
+Browser ──► web (React) ──/api/v1/books──► api (BFF) ──► Bupa API (/api/v1/bookowners)
+                                          rules, cache,      rate-limited, intermittently
+                                          retries            returns empty responses
+```
 
 ## Quick start
 
-### API (`api/`)
+Requires the **.NET 10 SDK** and **Node.js 20.19+**. Run the server and the client in two terminals:
 
-Requires the .NET 10 SDK.
+```bash
+# 1. Server: http://localhost:5080 (API reference at /scalar/v1)
+cd api
+dotnet run --project src/BupaBooks.Host
+
+# 2. Client: http://localhost:5173 (proxies /api to the server above)
+cd web
+npm ci
+npm run dev
+```
+
+### Checks
 
 ```bash
 cd api
-dotnet build                                      # also regenerates src/BupaBooks.Host/openapi/bupa-books.json
-dotnet test --filter "Category!=LiveContract"     # unit, integration and architecture tests (offline)
-dotnet test --filter "Category=LiveContract"      # checks the real Bupa API still matches our expectations
-dotnet run --project src/BupaBooks.Host           # http://localhost:5080 (API reference at /scalar/v1)
-```
+dotnet build                                    # warnings and vulnerable packages fail the build; regenerates openapi/bupa-books.json
+dotnet test --filter "Category!=LiveContract"   # unit, adapter, integration and architecture tests (offline)
+dotnet test --filter "Category=LiveContract"    # checks the real Bupa API still matches our expectations
 
-Try `GET http://localhost:5080/api/v1/books?ageCategory=child&format=hardcover`, or use `src/BupaBooks.Host/BupaBooks.Host.http`.
-
-### Web (`web/`)
-
-Requires Node.js 20.19+ (see `web/.nvmrc`).
-
-```bash
 cd web
-npm ci
-npm run dev        # http://localhost:5173, with /api proxied to the upstream API
-npm test           # unit + integration tests
-npm run ci         # everything CI runs: format, lint, typecheck, coverage gate, build
+npm run generate:api   # regenerate TypeScript types from the server's OpenAPI document
+npm run ci             # format, lint, typecheck, tests with coverage gate, build
 ```
 
-Configuration goes in `web/.env.local` (see `web/.env.example`). No secrets are needed.
+## How the requirements map to the code
 
-## BFF design at a glance
-
-- **Endpoint:** `GET /api/v1/books?ageCategory=adult|child&format=hardcover|paperback|ebook&limit=&cursor=` returns `{ items: [{ id, title, format }], page: { limit, nextCursor, totalCount } }`. No owner data leaves the server. ([ADR-0004](docs/adr/0004-bff-api-contract.md))
-- **Clean architecture in three projects:** Host → Application (domain model + use case + port) ← Infrastructure (HTTP client, resilience, cache, anti-corruption mapping). Layer rules are enforced by architecture tests. ([ADR-0005](docs/adr/0005-bff-clean-architecture.md))
-- **Reliability:** standard resilience pipeline (retry on transient errors, timeouts, circuit breaker), `HybridCache` with stampede protection, ETag/304 support, RFC 9457 problem details with `traceId`, upstream failures mapped to 502/503/504.
-- **Observability:** source-generated structured logs (no personal data), correlation id, OpenTelemetry traces and metrics (OTLP export when configured), liveness and readiness endpoints.
-
-## How the requirements map to the code (web client)
-
-| Requirement                       | Where it lives                                              | Verified by                                                  |
-| --------------------------------- | ----------------------------------------------------------- | ------------------------------------------------------------ |
-| Fetch API data                    | `features/books/api/bookOwnersApi.ts`                       | `bookOwnersApi.test.ts`                                      |
-| Adults ≥ 18, Children ≤ 17        | `features/books/domain/ageCategory.ts` (`ADULT_MIN_AGE`)    | boundary tests for 17 and 18                                 |
-| Grouped and alphabetically sorted | `features/books/domain/groupBooks.ts`                       | tests against the **live API payload** captured as a fixture |
-| "Get Books"                       | `FilterToolbar.tsx` → `BooksPage.tsx`                       | `App.test.tsx`                                               |
-| "Hardcover only"                  | `FILTER_PREDICATES` in `groupBooks.ts`                      | `App.test.tsx`, `groupBooks.test.ts`                         |
-| Dynamic headings                  | `features/books/domain/headings.ts`                         | `headingFor` table tests                                     |
-| 600px breakpoint                  | `src/index.css` (mobile-first, `@media (min-width: 600px)`) | screenshots above                                            |
-| Primary colour `#0079c8`          | `--color-primary` token in `index.css`                      | n/a                                                          |
+| Requirement                                       | Where it lives                                                                                    | Verified by                               |
+| ------------------------------------------------- | ------------------------------------------------------------------------------------------------- | ----------------------------------------- |
+| Server side that returns the data                 | `api/` → `GET /api/v1/books?ageCategory=&format=` ([ADR-0004](docs/adr/0004-bff-api-contract.md)) | `Host.IntegrationTests`                   |
+| Client side that fetches from our server          | `web/src/features/books/api/booksApi.ts` (same-origin `/api`)                                     | `booksApi.test.ts`, `App.test.tsx`        |
+| Must be a React app                               | `web/`                                                                                            | n/a                                       |
+| Adults ≥ 18, Children ≤ 17                        | `Application/Domain/Age.cs` (`AdultMinimumAge`)                                                   | `AgeTests` (17 and 18 boundaries)         |
+| All books, alphabetical, under their age category | `Application/Domain/BookSelection.cs`, `BookOrdering.cs`                                          | `BookSelectionTests`, using the live data |
+| "Get Books" / "Hardcover only"                    | `web/.../BookControls.tsx` → `?format=hardcover` on the server                                    | `App.test.tsx`, `BookSelectionTests`      |
+| Dynamic headings                                  | `web/src/features/books/headings.ts`                                                              | `headings.test.ts`, `App.test.tsx`        |
+| 600px breakpoint, `#0079c8`, reference layout     | `web/src/index.css` (mobile-first, `@media (min-width: 600px)`)                                   | screenshots above                         |
 
 ## Architecture
 
+### Server (`api/`): clean architecture in three projects ([ADR-0005](docs/adr/0005-bff-clean-architecture.md))
+
 ```
-src/
-├── config.ts                 Env-driven runtime config (base URL, timeout)
-├── lib/
-│   ├── http.ts               fetch wrapper: timeout, typed ApiError, correlation id
-│   └── logger.ts             Structured logger with a swappable sink
-├── components/ErrorBoundary.tsx
+BupaBooks.Host ─────────► BupaBooks.Application ◄───── BupaBooks.Infrastructure
+(endpoint, validation,     (Domain/ model + rules,       (typed HttpClient, resilience,
+ problem details, ETag,     GetBooks use case,            HybridCache, anti-corruption
+ OpenAPI, telemetry)        paging, IBookOwnerSource)     mapping of Bupa's JSON)
+```
+
+- **The server owns every business rule.** The client sends intent (`ageCategory=adult&format=hardcover`); it never sees an age.
+- **No personal data leaves the server.** Responses contain `{ id, title, format }` only.
+- **Reliability:** retries with backoff for 429/5xx/timeouts and for upstream's empty `200` responses ([ADR-0006](docs/adr/0006-upstream-behaviour.md)), circuit breaker, a 5-minute `HybridCache` with stampede protection (one upstream call however many users arrive at once), ETag/304, and errors as RFC 9457 problem details with a `traceId` (`502`/`503` + `Retry-After`/`504`).
+- **Boundaries are enforced by tests**, not convention: `ArchitectureTests` fail the build if the domain depends on anything else, or if Host code (other than `Program.cs`) uses Infrastructure.
+
+### Client (`web/`)
+
+```
+web/src/
+├── api/schema.d.ts         Generated from the server's OpenAPI document (npm run generate:api)
+├── config.ts               Env-driven config (same-origin base URL, timeout)
+├── lib/http.ts             fetch wrapper: timeout, typed ApiError, Retry-After, correlation id
+├── lib/logger.ts           Structured logger with a swappable sink
 └── features/books/
-    ├── api/                  Boundary: zod schema, DTO → domain mapping, fetch
-    ├── domain/               Pure business rules (no React, no I/O)
-    ├── hooks/                TanStack Query: caching, retries, cancellation
-    └── components/           Presentational + one container (BooksPage)
+    ├── model.ts            Types derived from the generated contract; filter → request mapping
+    ├── headings.ts         "Hardcover Books owned by Adults" (display text, not a business rule)
+    ├── api/booksApi.ts     GET /api/v1/books, follows paging cursors
+    ├── hooks/useBooks.ts   TanStack Query: one query per category, caching, retries
+    └── components/         BooksPage (container), BookCard, BookControls
 ```
 
-Data flows one way: **HTTP → validate → map to domain → group/filter/sort → render**. Each arrow is a function that can be tested on its own.
-
-- **Domain logic is pure.** `groupBooksByAgeCategory(owners, filter)` has no knowledge of React or HTTP. Most of the business rules are tested in milliseconds without a DOM.
-- **DTOs and domain types are separate.** The API uses `name`/`type`; the domain uses `title`/`format` with a closed union (`'hardcover' | 'paperback' | 'ebook' | 'other'`). If the API changes, only `schema.ts` changes.
-- **Exhaustive typing.** Filters, categories and error kinds are unions mapped through `Record<Union, …>` or exhaustive `switch` statements. Adding a new filter is a compile error until its heading and predicate exist.
-- **Fetch once, filter on the client.** Switching between "Get Books" and "Hardcover only" is instant and makes no extra request. The dataset is small; see the assumptions below for when that would change.
+- **One contract, two languages.** The server generates `openapi/bupa-books.json` at build time; the client generates its types from it. A server change that breaks the client is a **compile error**, and CI fails if either generated file is stale.
+- **Fetch per view, cache per view.** Each (category, filter) pair is cached, so switching back to a view already seen is instant; the server caches upstream data too.
+- **Retry only what is transient.** The client retries `503`/`504`/`429`/network errors, honouring `Retry-After`. It does **not** retry `502`, because the server has already retried the upstream.
 
 ## Key decisions
 
-Longer write-ups are in [`docs/adr`](docs/adr).
+All in [`docs/adr`](docs/adr):
 
-1. **React + TypeScript + Vite** over Power Platform or Blazor. It is the most direct way to show typed domain modelling, automated tests and a CI pipeline in a reviewable Git repo. ([ADR-0001](docs/adr/0001-technology-choice.md))
-2. **Same-origin `/api` proxy.** The browser never calls the upstream host directly. That avoids CORS dependence, keeps the upstream URL out of the bundle and leaves room for a BFF or APIM (auth, caching, rate limiting) later without changing frontend code. ([ADR-0002](docs/adr/0002-same-origin-api-proxy.md))
-3. **Runtime validation with zod.** The published Swagger document declares **no response schema**, so a TypeScript type alone would be an unchecked assumption. Malformed records are skipped and logged; a payload that is not an array fails loudly. ([ADR-0003](docs/adr/0003-runtime-validation.md))
-4. **TanStack Query for server state.** It handles de-duplication (double-clicks), caching, AbortSignal cancellation and retry/backoff without hand-rolled state machines.
-5. **Retry only what is transient.** Network errors, timeouts, 5xx, 408 and 429 are retried (max 2, exponential backoff). 4xx and contract errors are not. Retrying is safe because the request is an idempotent `GET`.
-6. **Accessibility built in.** Native buttons with `aria-pressed`, labelled `<section>` regions, a polite live region for loading, `role="alert"` for errors, visible focus rings, 44px touch targets and `prefers-reduced-motion`.
+| ADR                                             | Decision                                                                          |
+| ----------------------------------------------- | --------------------------------------------------------------------------------- |
+| [0001](docs/adr/0001-technology-choice.md)      | React + TypeScript + Vite client                                                  |
+| [0002](docs/adr/0002-same-origin-api-proxy.md)  | Browser only calls same-origin `/api` (now served by our BFF)                     |
+| [0003](docs/adr/0003-runtime-validation.md)     | Validate untrusted upstream data, skip bad records (moved to the BFF)             |
+| [0004](docs/adr/0004-bff-api-contract.md)       | API contract: filterable, paged books collection; no owner data; id assumption    |
+| [0005](docs/adr/0005-bff-clean-architecture.md) | Three-project clean architecture; domain in Application, enforced by tests        |
+| [0006](docs/adr/0006-upstream-behaviour.md)     | Upstream is rate-limited and intermittently returns empty bodies: retry and cache |
 
 ## Assumptions
 
-- **Endpoint:** `GET https://digitalcodingtest.bupa.com.au/api/v1/bookowners`. It is unauthenticated and returns `[{ name, age, books: [{ name, type }] }]`. The fixture in `src/test/fixtures` is a verbatim capture from 6 Oct 2026.
-- **Age boundary:** 18 and over is an Adult; 17 and under is a Child. Ages must be non-negative integers. Records that fail this are skipped and logged rather than guessed at.
-- **"Alphabetical"** means locale-aware (`en-AU`), case-insensitive and numeric-aware ("Book 2" before "Book 10"). Leading articles are **not** ignored ("The Hobbit" sorts under T).
-- **Duplicates:** If two owners in the same category own the same title, both copies are listed, because the data is about owned books. In the live data, the repeated titles (_Hamlet_, _Great Expectations_) fall into different categories. Changing this is a one-line change in `groupBooks.ts`.
-- **Book type matching** is case-insensitive. Unknown types map to `other`, so they show under "Get Books" but never under "Hardcover only".
-- **Owners with `books: null` or no `books` field** count as owning no books.
-- **Fetching on demand:** Nothing loads until the user clicks a button, matching "when selected". "Hardcover only" works on its own without clicking "Get Books" first.
-- **Data volume** is small. If it grew to thousands of records, filtering and pagination would move server-side (`?type=hardcover&page=…`) and the list would be virtualised.
-- **No authentication** is required by the API. See below for what production would need.
+- **Server and client.** The brief requires "a server side, to return data similar to the above, and a client side, to fetch the data from your server". We read "data similar to the above" as the grouped output (books under an age-category heading): `GET /api/v1/books?ageCategory=…` returns exactly one heading's books, already filtered and sorted.
+- **Upstream endpoint:** `GET https://digitalcodingtest.bupa.com.au/api/v1/bookowners`, unauthenticated, returning `[{ name, age, books: [{ name, type }] }]`. Its Swagger document declares no response schema, so the server validates every record.
+- **Identifiers.** The brief describes the data as _"similar to"_ the structure shown, so we assume production data carries stable ids. The test endpoint sends none, so the server derives deterministic ids when they are missing. Clients treat `id` as opaque.
+- **Age boundary:** 18 and over is an Adult; 17 and under is a Child. Records with a missing or negative age, or a missing name, are skipped and logged (without personal data).
+- **"Alphabetical"** means `en-AU`, case-insensitive and numeric-aware ("Book 2" before "Book 10"), with ties broken by id. Leading articles are **not** ignored ("The Hobbit" sorts under T).
+- **Duplicates:** every owned copy is listed. Two adults who both own _Hamlet_ produce two entries with different ids.
+- **Book types** match case-insensitively. Unknown types become `other`: shown under "Get Books", never under "Hardcover only".
+- **Fetching on demand:** nothing loads until the user clicks a button. "Hardcover only" works without clicking "Get Books" first.
+- **Data volume** is small; the client still follows paging cursors (100 per page) so it keeps working if it grows.
 
 ## Before releasing to production
 
-Treating this as a real Bupa release, these are the gaps I would close, roughly in priority order:
+**Hosting and security**
 
-**Security and compliance**
-
-- Serve through an API gateway or BFF (Azure APIM / Front Door) with **OAuth2/OIDC** (Entra ID) if the data is not public, plus rate limiting and WAF.
-- Security headers at the host: a strict **CSP** (`default-src 'self'`), HSTS, `X-Content-Type-Options`, `Referrer-Policy`, `frame-ancestors 'none'`.
-- Dependency and code scanning in CI (Dependabot is configured; add CodeQL or Snyk). Pin GitHub Actions to commit SHAs.
-- Privacy review: owner names and ages are personal information. The UI never shows them and the logs never record them. Keep it that way, and agree a data-classification and retention policy.
+- Serve the React build from the BFF (`wwwroot`, already wired with an SPA fallback) as one container, behind Azure Front Door/APIM with WAF.
+- Add **OAuth2/OIDC** (Entra ID) if the data is not public: the endpoint group is ready for `.RequireAuthorization()`.
+- Security headers: strict **CSP**, HSTS, `X-Content-Type-Options`, `Referrer-Policy`, `frame-ancestors 'none'`. Add server-side rate limiting per client.
+- Add CodeQL scanning; pin GitHub Actions to commit SHAs.
 
 **Reliability and operations**
 
-- Replace the console log sink with **Application Insights** (or equivalent), forward `X-Correlation-ID` end to end, and add web-vitals and error-rate dashboards with alerts.
-- Add a circuit breaker and response caching in the BFF, so a slow upstream does not hit every user.
-- Add a synthetic availability check against the deployed site.
+- Point the OpenTelemetry exporter at Application Insights; alert on the `recordSkipped` and upstream-failure log events and on 5xx rates.
+- Use a distributed cache (Redis) behind `HybridCache` when running more than one instance.
+- Synthetic availability check against the deployed site; the scheduled upstream contract test already covers Bupa's side.
 
-**Delivery**
+**Delivery and quality**
 
-- Branch protection on `main`: required CI checks, required review, signed commits.
-- Deployment pipeline with environment promotion (dev → test → prod), immutable build artefacts and one-click rollback. Feature flags for risky changes.
-- Track **DORA metrics** (deployment frequency, lead time, change failure rate, MTTR) from the pipeline.
-
-**Quality**
-
-- Playwright end-to-end tests against a stubbed API in CI (desktop and mobile viewports) plus automated **axe** accessibility checks.
-- Visual regression snapshots for the two breakpoints.
-- Contract test against the live API on a schedule, to detect upstream schema drift early.
+- Branch protection on `main`, environment promotion with immutable artefacts and one-click rollback; track **DORA metrics** from the pipeline.
+- Playwright end-to-end tests against the real BFF with a stubbed upstream, plus automated **axe** accessibility checks and visual snapshots at both breakpoints.
 
 ## Use of AI tooling
 
 This solution was built with an AI coding assistant, under the same rules I would apply in a team:
 
-- **Grounded in evidence:** the live API response and Swagger document were inspected before modelling. The missing response schema is what drove the runtime-validation decision.
-- **Constrained by guardrails:** strict `tsconfig` (`noUncheckedIndexedAccess`, `exactOptionalPropertyTypes`), lint with zero warnings, formatting checks, coverage thresholds (90% lines / 85% branches) and CI on every PR. Generated code has to pass the same gates as hand-written code.
-- **Reviewed by a person:** I reviewed every line, and the PR template asks reviewers to confirm the same. I am accountable for everything committed under my name, whoever or whatever typed it.
-
-## Scripts
-
-| Script                            | Purpose                                         |
-| --------------------------------- | ----------------------------------------------- |
-| `npm run dev`                     | Dev server with API proxy                       |
-| `npm run build`                   | Typecheck and production build to `dist/`       |
-| `npm run preview`                 | Serve the production build locally (with proxy) |
-| `npm test` / `npm run test:watch` | Vitest                                          |
-| `npm run test:coverage`           | Tests with the coverage gate                    |
-| `npm run lint`                    | oxlint (warnings fail the build)                |
-| `npm run typecheck`               | `tsc -b`                                        |
-| `npm run format` / `format:check` | Prettier                                        |
-| `npm run ci`                      | The full CI pipeline locally                    |
+- **Grounded in evidence:** the live API, its Swagger document and the challenge page were inspected before designing. The missing schema, the empty responses and the rate limiting each drove a design decision.
+- **Constrained by guardrails:** strict compilers on both sides (TypeScript `strict` + `exactOptionalPropertyTypes`; C# nullable + warnings as errors), NuGet vulnerability audit, lint with zero warnings, coverage thresholds, architecture tests, contract drift checks and CI on every PR. Generated code passes the same gates as hand-written code.
+- **Reviewed by a person:** I reviewed every line and can explain it. I am accountable for everything committed under my name, whoever or whatever typed it.

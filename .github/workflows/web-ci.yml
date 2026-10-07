@@ -2,10 +2,10 @@ name: Web CI
 
 on:
   pull_request:
-    paths: ['web/**', '.github/workflows/web-ci.yml']
+    paths: ['web/**', 'api/src/BupaBooks.Host/openapi/**', '.github/workflows/web-ci.yml']
   push:
     branches: [main]
-    paths: ['web/**', '.github/workflows/web-ci.yml']
+    paths: ['web/**', 'api/src/BupaBooks.Host/openapi/**', '.github/workflows/web-ci.yml']
 
 permissions:
   contents: read
@@ -32,6 +32,11 @@ jobs:
 
       - name: Install (lockfile only)
         run: npm ci
+
+      # The server's OpenAPI document is the contract. If the generated types differ
+      # from the committed ones, the client was not updated for an API change.
+      - name: API types are up to date
+        run: npm run check:api
 
       - name: Format check
         run: npm run format:check
