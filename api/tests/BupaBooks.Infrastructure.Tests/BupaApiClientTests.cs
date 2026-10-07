@@ -4,6 +4,7 @@ using BupaBooks.Infrastructure.BupaApi;
 using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Options;
 using Polly.CircuitBreaker;
+using Polly.RateLimiting;
 using Polly.Timeout;
 
 namespace BupaBooks.Infrastructure.Tests;
@@ -91,6 +92,7 @@ public class BupaApiClientTests
         { new TimeoutRejectedException("attempt timed out"), BookSourceFailure.Timeout },
         { new TaskCanceledException("HttpClient.Timeout elapsed"), BookSourceFailure.Timeout },
         { new BrokenCircuitException("circuit open"), BookSourceFailure.Unavailable },
+        { new RateLimiterRejectedException("bulkhead full"), BookSourceFailure.Unavailable },
     };
 
     [Theory]

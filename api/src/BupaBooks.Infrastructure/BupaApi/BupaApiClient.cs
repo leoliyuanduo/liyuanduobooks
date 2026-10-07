@@ -5,6 +5,7 @@ using BupaBooks.Infrastructure.BupaApi.Dtos;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Polly.CircuitBreaker;
+using Polly.RateLimiting;
 using Polly.Timeout;
 
 namespace BupaBooks.Infrastructure.BupaApi;
@@ -73,6 +74,11 @@ public sealed class BupaApiClient(HttpClient httpClient, IOptions<BupaApiOptions
                 "Upstream is temporarily unavailable.",
                 exception,
                 CircuitBreakDuration),
+            RateLimiterRejectedException => new(
+                BookSourceFailure.Unavailable,
+                "Too many concurrent upstream requests.",
+                exception,
+                TimeSpan.FromSeconds(1)),
             HttpRequestException => new(BookSourceFailure.UpstreamError, "Upstream request failed.", exception),
             JsonException => new(BookSourceFailure.InvalidResponse, "Upstream returned invalid JSON.", exception),
             _ => null,

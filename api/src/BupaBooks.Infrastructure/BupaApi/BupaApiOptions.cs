@@ -16,4 +16,11 @@ public sealed class BupaApiOptions
     /// <summary>How long a successful upstream response is reused. The data changes rarely.</summary>
     [Range(typeof(TimeSpan), "00:00:01", "01:00:00")]
     public TimeSpan CacheDuration { get; set; } = TimeSpan.FromMinutes(5);
+
+    /// <summary>
+    /// When upstream fails, serve the last successful response if it is at most this old
+    /// (graceful degradation instead of an error). Zero disables the fallback.
+    /// </summary>
+    [Range(typeof(TimeSpan), "00:00:00", "1.00:00:00")]
+    public TimeSpan MaxStaleness { get; set; } = TimeSpan.FromHours(1);
 }

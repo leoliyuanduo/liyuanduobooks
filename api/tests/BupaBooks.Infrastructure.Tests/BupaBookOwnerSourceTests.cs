@@ -1,6 +1,8 @@
+using System.Globalization;
 using System.Net;
 using BupaBooks.Application.Abstractions;
 using BupaBooks.Infrastructure.BupaApi;
+using Microsoft.Extensions.Caching.Hybrid;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 
@@ -12,7 +14,16 @@ namespace BupaBooks.Infrastructure.Tests;
 /// </summary>
 public class BupaBookOwnerSourceTests
 {
-    private static ServiceProvider BuildServices(StubHttpHandler upstream)
+    /// <summary>A clock the test controls, to make "data is too old" deterministic.</summary>
+    private sealed class ManualTimeProvider : TimeProvider
+    {
+        public DateTimeOffset UtcNow { get; set; } =
+            DateTimeOffset.Parse("2026-10-07T00:00:00Z", CultureInfo.InvariantCulture);
+
+        public override DateTimeOffset GetUtcNow() => UtcNow;
+    }
+
+    private static ServiceProvider BuildServices(StubHttpHandler upstream, TimeProvider? clock = null)
     {
         var configuration = new ConfigurationBuilder()
             .AddInMemoryCollection(new Dictionary<string, string?> { ["BupaApi:BaseUrl"] = "https://upstream.test/" })
@@ -22,6 +33,11 @@ public class BupaBookOwnerSourceTests
         services.AddLogging();
         services.AddInfrastructure(configuration);
         services.AddHttpClient<BupaApiClient>().ConfigurePrimaryHttpMessageHandler(() => upstream);
+        if (clock is not null)
+        {
+            services.AddSingleton(clock);
+        }
+
         return services.BuildServiceProvider();
     }
 
@@ -133,5 +149,56 @@ public class BupaBookOwnerSourceTests
 
         await Should.ThrowAsync<BookSourceException>(() => source.GetOwnersAsync(CancellationToken.None));
         (await source.GetOwnersAsync(CancellationToken.None)).Count.ShouldBe(5);
+    }
+
+    /// <summary>Upstream answers once with the live payload, then with an unrecoverable error.</summary>
+    private static StubHttpHandler HealthyThenBroken()
+    {
+        var attempt = 0;
+        return new StubHttpHandler((_, _) => Task.FromResult(
+            Interlocked.Increment(ref attempt) == 1
+                ? StubHttpHandler.JsonResponse(TestData.LivePayload())
+                : StubHttpHandler.JsonResponse("not json")));
+    }
+
+    [Fact]
+    public async Task Serves_last_known_good_data_when_upstream_fails()
+    {
+        var upstream = HealthyThenBroken();
+        await using var services = BuildServices(upstream);
+        var source = services.GetRequiredService<IBookOwnerSource>();
+
+        await source.GetOwnersAsync(CancellationToken.None);
+        await services.GetRequiredService<HybridCache>().RemoveAsync(BupaBookOwnerSource.CacheKey);
+
+        var owners = await source.GetOwnersAsync(CancellationToken.None);
+
+        owners.Count.ShouldBe(5); // stale, but useful
+        upstream.Calls.ShouldBe(2); // upstream really was asked again
+    }
+
+    [Fact]
+    public async Task Without_earlier_data_the_failure_is_reported()
+    {
+        await using var services = BuildServices(StubHttpHandler.Json("not json"));
+
+        var ex = await Should.ThrowAsync<BookSourceException>(
+            () => services.GetRequiredService<IBookOwnerSource>().GetOwnersAsync(CancellationToken.None));
+
+        ex.Failure.ShouldBe(BookSourceFailure.InvalidResponse);
+    }
+
+    [Fact]
+    public async Task Data_older_than_the_staleness_limit_is_not_served()
+    {
+        var clock = new ManualTimeProvider();
+        await using var services = BuildServices(HealthyThenBroken(), clock);
+        var source = services.GetRequiredService<IBookOwnerSource>();
+
+        await source.GetOwnersAsync(CancellationToken.None);
+        await services.GetRequiredService<HybridCache>().RemoveAsync(BupaBookOwnerSource.CacheKey);
+        clock.UtcNow += TimeSpan.FromHours(2); // default MaxStaleness is 1 hour
+
+        await Should.ThrowAsync<BookSourceException>(() => source.GetOwnersAsync(CancellationToken.None));
     }
 }

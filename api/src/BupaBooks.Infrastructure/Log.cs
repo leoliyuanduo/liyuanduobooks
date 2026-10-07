@@ -25,4 +25,8 @@ internal static partial class Log
     [LoggerMessage(EventId = 1004, Level = LogLevel.Warning,
         Message = "Upstream book source failed: {Failure}")]
     public static partial void UpstreamFailed(ILogger logger, Exception exception, BookSourceFailure failure);
+
+    [LoggerMessage(EventId = 1005, Level = LogLevel.Warning,
+        Message = "Upstream failed ({Failure}); serving last known good data, {AgeSeconds} s old")]
+    public static partial void ServingStaleData(ILogger logger, BookSourceFailure failure, long ageSeconds);
 }
