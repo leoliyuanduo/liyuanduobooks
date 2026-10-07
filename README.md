@@ -107,14 +107,15 @@ web/src/
 
 All in [`docs/adr`](docs/adr):
 
-| ADR                                             | Decision                                                                          |
-| ----------------------------------------------- | --------------------------------------------------------------------------------- |
-| [0001](docs/adr/0001-technology-choice.md)      | React + TypeScript + Vite client                                                  |
-| [0002](docs/adr/0002-same-origin-api-proxy.md)  | Browser only calls same-origin `/api` (now served by our BFF)                     |
-| [0003](docs/adr/0003-runtime-validation.md)     | Validate untrusted upstream data, skip bad records (moved to the BFF)             |
-| [0004](docs/adr/0004-bff-api-contract.md)       | API contract: filterable, paged books collection; no owner data; id assumption    |
-| [0005](docs/adr/0005-bff-clean-architecture.md) | Three-project clean architecture; domain in Application, enforced by tests        |
-| [0006](docs/adr/0006-upstream-behaviour.md)     | Upstream is rate-limited and intermittently returns empty bodies: retry and cache |
+| ADR                                                            | Decision                                                                          |
+| -------------------------------------------------------------- | --------------------------------------------------------------------------------- |
+| [0001](docs/adr/0001-technology-choice.md)                     | React + TypeScript + Vite client                                                  |
+| [0002](docs/adr/0002-same-origin-api-proxy.md)                 | Browser only calls same-origin `/api` (now served by our BFF)                     |
+| [0003](docs/adr/0003-runtime-validation.md)                    | Validate untrusted upstream data, skip bad records (moved to the BFF)             |
+| [0004](docs/adr/0004-bff-api-contract.md)                      | API contract: filterable, paged books collection; no owner data; id assumption    |
+| [0005](docs/adr/0005-bff-clean-architecture.md)                | Three-project clean architecture; domain in Application, enforced by tests        |
+| [0006](docs/adr/0006-upstream-behaviour.md)                    | Upstream is rate-limited and intermittently returns empty bodies: retry and cache |
+| [0007](docs/adr/0007-edge-protection-and-cascading-failure.md) | Per-IP rate limit, security headers, bulkhead, circuit breaker, stale fallback    |
 
 ## Assumptions
 
