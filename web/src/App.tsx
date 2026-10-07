@@ -11,7 +11,7 @@ export function App() {
     <QueryClientProvider client={queryClient}>
       <header className="app-header">
         <div className="app-header__inner">
-          <h1 className="app-header__title">Book Library</h1>
+          <h1 className="app-header__title">Owners and Books</h1>
         </div>
       </header>
       <main className="app-main">

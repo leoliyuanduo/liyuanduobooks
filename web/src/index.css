@@ -1,21 +1,21 @@
 /*
- * Design tokens. #0079c8 is the brand primary from the brief.
- * Mobile-first: base styles target small screens; the 600px breakpoint
- * (from the brief) switches to the side-by-side desktop layout.
+ * Layout follows the reference screenshots on the challenge page (not pixel-perfect):
+ * a blue title bar, two cards with solid blue heading blocks, then a divider with
+ * the controls below it. #0079c8 is the brand primary from the brief.
+ * Mobile-first: base styles are the < 600px layout; 600px and up is the desktop layout.
  */
 :root {
   --color-primary: #0079c8;
   --color-primary-dark: #005a96;
-  --color-primary-tint: #e6f2fa;
   --color-text: #1f2933;
   --color-muted: #52606d;
   --color-surface: #ffffff;
-  --color-background: #f5f7fa;
-  --color-border: #d9e2ec;
+  --color-border: #9aa5b1;
+  --color-divider: #cbd2d9;
   --color-error: #b42318;
   --color-error-tint: #fef3f2;
 
-  --radius: 8px;
+  --radius: 6px;
   --space-1: 0.25rem;
   --space-2: 0.5rem;
   --space-3: 1rem;
@@ -32,7 +32,7 @@
     sans-serif;
   line-height: 1.5;
   color: var(--color-text);
-  background: var(--color-background);
+  background: var(--color-surface);
   -webkit-font-smoothing: antialiased;
 }
 
@@ -45,84 +45,158 @@
 body {
   margin: 0;
   min-height: 100vh;
-  background: var(--color-background);
+  background: var(--color-surface);
 }
 
-/* ---------- Header ---------- */
+/* ---------- Title bar ---------- */
 .app-header {
   background: var(--color-primary);
   color: #fff;
-}
-
-.app-header__inner,
-.app-main {
-  max-width: 960px;
-  margin: 0 auto;
+  text-align: center;
   padding: var(--space-3);
 }
 
 .app-header__title {
   margin: 0;
-  font-size: 1.25rem;
-  font-weight: 600;
+  font-size: 1.75rem;
+  font-weight: 700;
 }
 
-/* ---------- Toolbar ---------- */
-.toolbar {
+.app-main {
+  max-width: 760px;
+  margin: 0 auto;
+  padding: var(--space-4) var(--space-3);
+}
+
+/* ---------- Book cards ---------- */
+.book-cards {
   display: flex;
   flex-direction: column;
-  gap: var(--space-2);
-  margin-bottom: var(--space-4);
+  align-items: center;
+  gap: var(--space-4);
 }
 
-.button {
+.book-card {
+  width: 100%;
+  max-width: 340px;
+  padding: var(--space-2);
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius);
+  box-shadow: 4px 4px 0 rgb(0 0 0 / 0.55);
+}
+
+.book-card__heading {
+  margin: 0 0 var(--space-2);
+  padding: var(--space-3) var(--space-2);
+  background: var(--color-primary);
+  color: #fff;
+  font-size: 1.75rem;
+  line-height: 1.2;
+  text-align: center;
+}
+
+.book-card__list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.book-card__list li {
+  padding: 1px 0;
+}
+
+.book-card__empty {
+  margin: 0;
+  color: var(--color-muted);
+}
+
+/* ---------- Divider and controls ---------- */
+.divider {
+  border: 0;
+  border-top: 1px solid var(--color-divider);
+  margin: var(--space-4) 0 var(--space-3);
+}
+
+.controls {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.button-primary,
+.button-secondary {
   appearance: none;
   min-height: 44px; /* comfortable touch target */
-  padding: var(--space-2) var(--space-4);
+  padding: var(--space-2) var(--space-5);
   border: 2px solid var(--color-primary);
   border-radius: var(--radius);
-  background: var(--color-surface);
-  color: var(--color-primary);
+  background: var(--color-primary);
+  color: #fff;
   font: inherit;
   font-weight: 600;
   cursor: pointer;
-  transition:
-    background-color 120ms ease,
-    color 120ms ease;
 }
 
-.button:hover {
-  background: var(--color-primary-tint);
+.button-primary {
+  width: 100%;
+  max-width: 260px;
 }
 
-.button[aria-pressed='true'] {
-  background: var(--color-primary);
-  color: #fff;
-}
-
-.button[aria-pressed='true']:hover {
+.button-primary:hover {
   background: var(--color-primary-dark);
   border-color: var(--color-primary-dark);
 }
 
-.button:focus-visible {
+.button-primary[aria-pressed='true'] {
+  box-shadow: inset 0 0 0 2px #fff;
+}
+
+.button-secondary {
+  min-height: 36px;
+  padding: var(--space-1) var(--space-3);
+}
+
+.button-link {
+  appearance: none;
+  min-height: 44px;
+  padding: var(--space-1) var(--space-2);
+  border: 0;
+  background: none;
+  color: var(--color-primary);
+  font: inherit;
+  font-weight: 600;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+  cursor: pointer;
+}
+
+.button-link:hover {
+  color: var(--color-primary-dark);
+}
+
+.button-link[aria-pressed='true'] {
+  text-decoration-thickness: 3px;
+}
+
+.button-primary:focus-visible,
+.button-secondary:focus-visible,
+.button-link:focus-visible {
   outline: 3px solid var(--color-primary-dark);
   outline-offset: 2px;
 }
 
-.button[aria-busy='true'] {
+[aria-busy='true'] {
   cursor: progress;
-}
-
-.button--secondary {
-  min-height: 36px;
-  padding: var(--space-1) var(--space-3);
 }
 
 /* ---------- Status / messages ---------- */
 .status__loading,
 .hint {
+  margin: 0 0 var(--space-3);
   color: var(--color-muted);
+  text-align: center;
 }
 
 .alert {
@@ -143,71 +217,38 @@ body {
   margin: 0;
 }
 
-/* ---------- Book groups ---------- */
-.book-groups {
-  display: grid;
-  grid-template-columns: 1fr;
-  gap: var(--space-3);
-}
-
-.book-group {
-  background: var(--color-surface);
-  border: 1px solid var(--color-border);
-  border-top: 4px solid var(--color-primary);
-  border-radius: var(--radius);
-  padding: var(--space-3);
-}
-
-.book-group__heading {
-  margin: 0 0 var(--space-2);
-  font-size: 1.125rem;
-  color: var(--color-primary);
-}
-
-.book-group__list {
-  margin: 0;
-  padding: 0;
-  list-style: none;
-}
-
-.book-group__item {
-  padding: var(--space-2) 0;
-  border-bottom: 1px solid var(--color-border);
-}
-
-.book-group__item:last-child {
-  border-bottom: none;
-}
-
-.book-group__empty {
-  margin: 0;
-  color: var(--color-muted);
-}
-
 /* ---------- Desktop: 600px and wider ---------- */
 @media (min-width: 600px) {
-  .app-header__inner,
-  .app-main {
-    padding: var(--space-4) var(--space-5);
+  .app-header__title {
+    font-size: 2rem;
   }
 
-  .app-header__title {
+  .book-cards {
+    flex-direction: row;
+    align-items: flex-start;
+    justify-content: center;
+    gap: var(--space-5);
+  }
+
+  .book-card {
+    flex: 1 1 0;
+    padding: 0;
+    border: 0;
+    box-shadow: none;
+  }
+
+  .book-card__heading {
     font-size: 1.5rem;
   }
 
-  .toolbar {
-    flex-direction: row;
+  /* Link to the left of the button, both right-aligned (as in the desktop screenshot). */
+  .controls {
+    flex-direction: row-reverse;
+    justify-content: flex-start;
+    gap: var(--space-3);
   }
 
-  .book-groups {
-    grid-template-columns: repeat(2, 1fr);
-    gap: var(--space-4);
-    align-items: start;
-  }
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .button {
-    transition: none;
+  .button-primary {
+    width: auto;
   }
 }

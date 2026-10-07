@@ -1,60 +1,58 @@
-import { useMemo, useState } from 'react';
-import { groupBooksByAgeCategory } from '../domain/groupBooks';
-import { headingFor } from '../domain/headings';
-import { AGE_CATEGORIES, type BookFilter } from '../domain/types';
-import { useBookOwners } from '../hooks/useBookOwners';
-import { BookGroup } from './BookGroup';
+import { useState } from 'react';
+import { headingFor } from '../headings';
+import { useBooksByCategory } from '../hooks/useBooks';
+import { AGE_CATEGORIES, type BookFilter } from '../model';
+import { BookCard } from './BookCard';
+import { BookControls } from './BookControls';
 import { describeError } from './errorMessages';
-import { FilterToolbar } from './FilterToolbar';
 
 /**
- * Container component: owns the UI state (which filter is selected) and wires
- * the query to presentational components. Data is fetched once and filtered
- * client-side, so switching filters is instant and does not hit the API.
+ * Container component: owns which view is selected and wires the server state
+ * to presentational components. Nothing is fetched until the user asks
+ * ("When you click Get Books, all books are shown").
  */
 export function BooksPage() {
-  // null = the user has not asked for books yet (the challenge says "when selected").
   const [filter, setFilter] = useState<BookFilter | null>(null);
-  const query = useBookOwners(filter !== null);
-
-  const grouped = useMemo(
-    () => (query.data && filter ? groupBooksByAgeCategory(query.data, filter) : null),
-    [query.data, filter],
-  );
+  const { books, isLoading, isFetching, error, refetch } = useBooksByCategory(filter);
 
   const handleSelect = (next: BookFilter) => {
     setFilter(next);
     // Let a user recover from a failed load by clicking again.
-    if (query.isError) void query.refetch();
+    if (error) refetch();
   };
+
+  const allLoaded = filter !== null && AGE_CATEGORIES.every((category) => books[category] !== undefined);
 
   return (
     <>
-      <FilterToolbar selected={filter} busy={query.isFetching} onSelect={handleSelect} />
-
-      {/* Polite live region: screen readers announce loading and errors. */}
+      {/* Polite live region: screen readers announce loading. */}
       <div className="status" role="status" aria-live="polite">
-        {query.isLoading && <p className="status__loading">Loading books…</p>}
+        {isLoading && <p className="status__loading">Loading books…</p>}
       </div>
 
-      {query.isError && (
+      {error && !allLoaded && (
         <div className="alert" role="alert">
-          <p>{describeError(query.error)}</p>
-          <button type="button" className="button button--secondary" onClick={() => void query.refetch()}>
+          <p>{describeError(error)}</p>
+          <button type="button" className="button-secondary" onClick={refetch}>
             Try again
           </button>
         </div>
       )}
 
-      {filter === null && !query.data && <p className="hint">Select “Get Books” to load the book list.</p>}
+      {filter === null && (
+        <p className="hint">Select “Get Books” to see every book, grouped by the age of its owner.</p>
+      )}
 
-      {grouped && filter && (
-        <div className="book-groups">
+      {allLoaded && (
+        <div className="book-cards">
           {AGE_CATEGORIES.map((category) => (
-            <BookGroup key={category} heading={headingFor(category, filter)} books={grouped[category]} />
+            <BookCard key={category} heading={headingFor(category, filter)} books={books[category] ?? []} />
           ))}
         </div>
       )}
+
+      <hr className="divider" />
+      <BookControls selected={filter} busy={isFetching} onSelect={handleSelect} />
     </>
   );
 }

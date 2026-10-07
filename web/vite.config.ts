@@ -4,12 +4,12 @@ import { defineConfig, loadEnv } from 'vite';
 
 export default defineConfig(({ mode }) => {
   const env = loadEnv(mode, process.cwd(), '');
-  const upstream = env['API_PROXY_TARGET'] ?? 'https://digitalcodingtest.bupa.com.au';
+  const bff = env['API_PROXY_TARGET'] ?? 'http://localhost:5080';
 
-  // Same-origin proxy: the browser calls /api/*, Vite forwards to the upstream API.
-  // This sidesteps CORS in dev/preview; production uses the hosting layer for the same.
+  // Same-origin proxy: the browser calls /api/*, Vite forwards to our BFF (api/), never to Bupa directly.
+  // In production the BFF serves this app itself, so the same relative URLs just work.
   const proxy = {
-    '/api': { target: upstream, changeOrigin: true, secure: true },
+    '/api': { target: bff, changeOrigin: true },
   };
 
   return {

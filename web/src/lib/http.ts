@@ -8,20 +8,36 @@
  */
 export type ApiErrorKind = 'network' | 'timeout' | 'http' | 'contract' | 'aborted';
 
+/**
+ * Statuses worth retrying from the browser. Deliberately excludes 502: the BFF
+ * already retried the upstream before answering "bad gateway", so retrying again
+ * only multiplies load. 503 (circuit open) and 504 (timeout) are worth one more try.
+ */
+const RETRYABLE_STATUSES: ReadonlySet<number> = new Set([408, 429, 500, 503, 504]);
+
+export interface ApiErrorOptions {
+  readonly status?: number;
+  readonly retryAfterMs?: number;
+  readonly cause?: unknown;
+}
+
 export class ApiError extends Error {
   readonly kind: ApiErrorKind;
   readonly status: number | undefined;
+  /** Server-provided hint (Retry-After header) for when to try again. */
+  readonly retryAfterMs: number | undefined;
 
-  constructor(kind: ApiErrorKind, message: string, options?: { status?: number; cause?: unknown }) {
+  constructor(kind: ApiErrorKind, message: string, options?: ApiErrorOptions) {
     super(message, options?.cause === undefined ? undefined : { cause: options.cause });
     this.name = 'ApiError';
     this.kind = kind;
     this.status = options?.status;
+    this.retryAfterMs = options?.retryAfterMs;
   }
 
   /**
    * Transient failures are worth retrying; client errors and bad payloads are not
-   * (retrying a 404 or a malformed response just delays the inevitable).
+   * (retrying a 400 or a malformed response just delays the inevitable).
    * GET is idempotent, so retrying it is safe.
    */
   get isRetryable(): boolean {
@@ -30,12 +46,19 @@ export class ApiError extends Error {
       case 'timeout':
         return true;
       case 'http':
-        return this.status === undefined || this.status >= 500 || this.status === 429 || this.status === 408;
+        return this.status !== undefined && RETRYABLE_STATUSES.has(this.status);
       case 'contract':
       case 'aborted':
         return false;
     }
   }
+}
+
+/** Parses a Retry-After header given in seconds (the form the BFF sends). */
+export function parseRetryAfter(value: string | null): number | undefined {
+  if (value === null || value.trim() === '') return undefined;
+  const seconds = Number(value);
+  return Number.isFinite(seconds) && seconds >= 0 ? seconds * 1000 : undefined;
 }
 
 export interface GetJsonOptions {
@@ -64,7 +87,11 @@ export async function getJson(url: string, options: GetJsonOptions): Promise<unk
   }
 
   if (!response.ok) {
-    throw new ApiError('http', `Request failed with HTTP ${response.status}`, { status: response.status });
+    const retryAfterMs = parseRetryAfter(response.headers.get('Retry-After'));
+    throw new ApiError('http', `Request failed with HTTP ${response.status}`, {
+      status: response.status,
+      ...(retryAfterMs === undefined ? {} : { retryAfterMs }),
+    });
   }
 
   try {

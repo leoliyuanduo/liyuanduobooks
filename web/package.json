@@ -14,13 +14,14 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "test:coverage": "vitest run --coverage",
-    "ci": "npm run format:check && npm run lint && npm run typecheck && npm run test:coverage && vite build"
+    "ci": "npm run format:check && npm run lint && npm run typecheck && npm run test:coverage && vite build",
+    "generate:api": "openapi-typescript ../api/src/BupaBooks.Host/openapi/bupa-books.json -o src/api/schema.d.ts",
+    "check:api": "npm run generate:api && git diff --exit-code -- src/api/schema.d.ts"
   },
   "dependencies": {
     "@tanstack/react-query": "^5.104.1",
     "react": "^19.2.8",
-    "react-dom": "^19.2.8",
-    "zod": "^4.6.5"
+    "react-dom": "^19.2.8"
   },
   "devDependencies": {
     "@testing-library/jest-dom": "^7.0.1",
@@ -32,6 +33,7 @@
     "@vitejs/plugin-react": "^6.1.1",
     "@vitest/coverage-v8": "^5.0.3",
     "jsdom": "^29.1.1",
+    "openapi-typescript": "^7.13.0",
     "oxlint": "^1.81.0",
     "prettier": "^3.9.9",
     "typescript": "~6.0.2",
@@ -40,5 +42,10 @@
   },
   "engines": {
     "node": ">=20.19"
+  },
+  "overrides": {
+    "openapi-typescript": {
+      "typescript": "$typescript"
+    }
   }
 }

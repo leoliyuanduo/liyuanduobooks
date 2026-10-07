@@ -1,10 +1,9 @@
 /**
  * Runtime configuration, read once from Vite env variables (see .env.example).
  *
- * The browser calls a same-origin path (`/api` by default). In development the
- * Vite dev server proxies it to the upstream API (vite.config.ts); in production
- * the hosting layer (Azure Front Door / APIM / Static Web Apps route, or a BFF)
- * does the same. This avoids CORS issues and keeps the upstream URL out of the bundle.
+ * The browser only ever talks to OUR server (the BFF in /api), on the same origin:
+ * in development the Vite dev server proxies /api to the BFF (vite.config.ts); in
+ * production the BFF serves this app itself. No CORS, and no upstream URLs in the bundle.
  */
 function readPositiveInt(value: string | undefined, fallback: number): number {
   const parsed = Number(value);
@@ -12,9 +11,11 @@ function readPositiveInt(value: string | undefined, fallback: number): number {
 }
 
 export const config = {
-  apiBaseUrl: import.meta.env.VITE_API_BASE_URL ?? '/api',
-  requestTimeoutMs: readPositiveInt(import.meta.env.VITE_REQUEST_TIMEOUT_MS, 8000),
+  /** Origin of the BFF. Empty = same origin (the default and recommended setup). */
+  apiBaseUrl: import.meta.env.VITE_API_BASE_URL ?? '',
+  /** Must exceed the BFF's own upstream budget (10 s incl. retries) so the BFF can answer with a proper error first. */
+  requestTimeoutMs: readPositiveInt(import.meta.env.VITE_REQUEST_TIMEOUT_MS, 15000),
   maxRetries: 2,
-  /** Book-owner data changes rarely; avoid refetching on every click. */
+  /** The BFF caches upstream data for 5 minutes; refetching more often gains nothing. */
   staleTimeMs: 5 * 60 * 1000,
 } as const;
