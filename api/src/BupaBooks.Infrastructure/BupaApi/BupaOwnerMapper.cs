@@ -27,13 +27,13 @@ internal static class BupaOwnerMapper
     {
         var name = dto.Name!;
         var age = dto.Age!.Value;
-        var ownerId = string.IsNullOrWhiteSpace(dto.Id) ? DerivedId.ForOwner(index, name, age) : dto.Id;
+        var ownerId = DerivedId.ForOwner(index, name, age);
 
         var books = (dto.Books ?? []).Select((book, bookIndex) =>
         {
             var title = book.Name!;
             var type = book.Type ?? string.Empty;
-            var bookId = string.IsNullOrWhiteSpace(book.Id) ? DerivedId.ForBook(ownerId, bookIndex, title, type) : book.Id;
+            var bookId = DerivedId.ForBook(ownerId, bookIndex, title, type);
             return new OwnedBook(BookId.From(bookId), title, ToBookFormat(type));
         });
 

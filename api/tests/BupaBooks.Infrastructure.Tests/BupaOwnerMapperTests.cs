@@ -19,24 +19,25 @@ public class BupaOwnerMapperTests
         BupaOwnerMapper.ToBookFormat(upstream).ShouldBe(expected);
 
     [Fact]
-    public void Uses_upstream_ids_when_present()
+    public void Maps_an_owner_and_their_books_to_the_domain()
     {
-        var dto = new BupaBookOwnerDto("owner-7", "Jane", 23, [new BupaBookDto("42", "Hamlet", "Hardcover")]);
+        var dto = new BupaBookOwnerDto("Jane", 23, [new BupaBookDto("Hamlet", "Hardcover")]);
 
         var owner = BupaOwnerMapper.ToDomain([dto]).Single();
 
-        owner.Id.Value.ShouldBe("owner-7");
-        owner.Books.Single().Id.Value.ShouldBe("42");
+        owner.Name.ShouldBe("Jane");
         owner.Category.ShouldBe(AgeCategory.Adult);
+        owner.Books.Single().Title.ShouldBe("Hamlet");
+        owner.Books.Single().Format.ShouldBe(BookFormat.Hardcover);
     }
 
     [Fact]
-    public void Derives_deterministic_unique_ids_when_upstream_has_none()
+    public void Derives_deterministic_unique_ids()
     {
         BupaBookOwnerDto[] dtos =
         [
-            new(null, "Ann", 40, [new(null, "Hamlet", "Hardcover"), new(null, "Hamlet", "Hardcover")]),
-            new(null, "Ann", 40, [new(null, "Hamlet", "Hardcover")]),
+            new("Ann", 40, [new("Hamlet", "Hardcover"), new("Hamlet", "Hardcover")]),
+            new("Ann", 40, [new("Hamlet", "Hardcover")]),
         ];
 
         var first = BupaOwnerMapper.ToDomain(dtos);

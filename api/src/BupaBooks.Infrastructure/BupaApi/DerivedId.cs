@@ -5,10 +5,11 @@ using System.Text;
 namespace BupaBooks.Infrastructure.BupaApi;
 
 /// <summary>
-/// Fallback identifiers for records that arrive without one (the test endpoint
-/// sends none). Deterministic: the same payload always yields the same ids, so
-/// caching, ETags and paging stay stable. They are only stable while upstream
-/// data is unchanged, which is why real upstream ids always take precedence.
+/// Identifiers for upstream records, which carry none. Each owned copy needs a stable
+/// id (React list keys, the sort tie-break, deterministic paging), so the server derives
+/// one from the record's content and position. Deterministic: the same payload always
+/// yields the same ids, so caching, ETags and paging stay stable. Ids stay stable while
+/// the upstream data is unchanged; clients must treat them as opaque.
 /// </summary>
 internal static class DerivedId
 {
