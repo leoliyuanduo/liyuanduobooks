@@ -8,7 +8,7 @@
     "build": "tsc -b && vite build",
     "preview": "vite preview",
     "typecheck": "tsc -b",
-    "lint": "oxlint --deny-warnings src",
+    "lint": "oxlint --deny-warnings src e2e",
     "format": "prettier --write .",
     "format:check": "prettier --check .",
     "test": "vitest run",
@@ -16,7 +16,8 @@
     "test:coverage": "vitest run --coverage",
     "ci": "npm run format:check && npm run lint && npm run typecheck && npm run test:coverage && vite build",
     "generate:api": "openapi-typescript ../api/src/BupaBooks.Host/openapi/bupa-books.json -o src/api/schema.d.ts",
-    "check:api": "npm run generate:api && git diff --exit-code -- src/api/schema.d.ts"
+    "check:api": "npm run generate:api && git diff --exit-code -- src/api/schema.d.ts",
+    "e2e": "playwright test"
   },
   "dependencies": {
     "@tanstack/react-query": "^5.104.1",
@@ -24,6 +25,8 @@
     "react-dom": "^19.2.8"
   },
   "devDependencies": {
+    "@axe-core/playwright": "^4.13.0",
+    "@playwright/test": "^1.64.0",
     "@testing-library/jest-dom": "^7.0.1",
     "@testing-library/react": "^16.3.3",
     "@testing-library/user-event": "^14.6.7",

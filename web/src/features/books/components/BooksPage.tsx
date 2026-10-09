@@ -1,18 +1,18 @@
-import { useState } from 'react';
 import { headingFor } from '../headings';
 import { useBooksByCategory } from '../hooks/useBooks';
+import { useViewParam } from '../hooks/useViewParam';
 import { AGE_CATEGORIES, type BookFilter } from '../model';
 import { BookCard } from './BookCard';
 import { BookControls } from './BookControls';
 import { describeError } from './errorMessages';
 
 /**
- * Container component: owns which view is selected and wires the server state
- * to presentational components. Nothing is fetched until the user asks
- * ("When you click Get Books, all books are shown").
+ * Container component: owns which view is selected (kept in the URL) and wires the
+ * server state to presentational components. Nothing is fetched until the user asks
+ * ("When you click Get Books, all books are shown") or opens a link to a view.
  */
 export function BooksPage() {
-  const [filter, setFilter] = useState<BookFilter | null>(null);
+  const [filter, setFilter] = useViewParam();
   const { books, isLoading, isFetching, error, refetch } = useBooksByCategory(filter);
 
   const handleSelect = (next: BookFilter) => {

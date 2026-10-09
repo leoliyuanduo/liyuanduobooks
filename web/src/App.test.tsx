@@ -1,4 +1,4 @@
-import { render, screen, within } from '@testing-library/react';
+import { act, render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { describe, expect, it } from 'vitest';
 import { App } from './App';
@@ -143,5 +143,55 @@ describe('App (integration, against a fake BFF)', () => {
 
     expect(await screen.findByRole('heading', { name: 'Books owned by Children' })).toBeInTheDocument();
     expect(fetchMock).toHaveBeenCalledTimes(3);
+  });
+});
+
+describe('App: view in the URL', () => {
+  it('records the selected view in the URL so it can be shared', async () => {
+    fakeServer();
+    const user = userEvent.setup();
+    render(<App />);
+
+    await user.click(screen.getByRole('button', { name: 'Hardcover only' }));
+
+    expect(window.location.search).toBe('?view=hardcover');
+  });
+
+  it('opens straight into the view named in the URL', async () => {
+    window.history.replaceState(null, '', '/?view=hardcover');
+    fakeServer();
+    render(<App />);
+
+    expect(
+      await screen.findByRole('heading', { name: 'Hardcover Books owned by Adults' }),
+    ).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Hardcover only' })).toHaveAttribute('aria-pressed', 'true');
+  });
+
+  it('ignores an unknown view instead of trusting it', () => {
+    window.history.replaceState(null, '', '/?view=everything');
+    const fetchMock = fakeServer();
+    render(<App />);
+
+    expect(fetchMock).not.toHaveBeenCalled();
+    expect(screen.getByText(/select “get books”/i)).toBeInTheDocument();
+  });
+
+  it('Back returns to the previous view', async () => {
+    fakeServer();
+    const user = userEvent.setup();
+    render(<App />);
+
+    await user.click(screen.getByRole('button', { name: 'Get Books' }));
+    await screen.findByRole('heading', { name: 'Books owned by Adults' });
+    await user.click(screen.getByRole('button', { name: 'Hardcover only' }));
+    await screen.findByRole('heading', { name: 'Hardcover Books owned by Adults' });
+
+    act(() => {
+      window.history.back();
+    });
+
+    expect(await screen.findByRole('heading', { name: 'Books owned by Adults' })).toBeInTheDocument();
+    expect(window.location.search).toBe('?view=all');
   });
 });

@@ -6,6 +6,8 @@ import { setLogSink } from '../lib/logger';
 beforeEach(() => {
   // Keep test output quiet; individual tests can install a spy sink.
   setLogSink(() => {});
+  // The selected view lives in the URL; start every test from a clean one.
+  window.history.replaceState(null, '', '/');
 });
 
 afterEach(() => {
