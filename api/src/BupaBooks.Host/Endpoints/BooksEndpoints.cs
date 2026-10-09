@@ -56,7 +56,7 @@ public static class BooksEndpoints
         var body = page.ToResponse();
 
         var etag = HttpCaching.ComputeETag(body, jsonOptions.Value.SerializerOptions);
-        httpContext.Response.Headers.ETag = etag;
+        httpContext.Response.Headers.ETag = etag.ToString();
         httpContext.Response.Headers.CacheControl = HttpCaching.CacheControlValue;
 
         if (HttpCaching.MatchesIfNoneMatch(httpContext.Request, etag))
