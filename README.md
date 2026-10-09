@@ -9,16 +9,17 @@ A React app with its own server. The **server** (an ASP.NET Core BFF) fetches th
 ## Reviewer's guide (5 minutes)
 
 1. **Run it:** `docker compose up --build`, then open http://localhost:8080. One image serves the React app and the API.
-2. **Requirements → code:** see [the table below](#how-the-requirements-map-to-the-code). Every requirement points at the code and the test that proves it.
-3. **The business rules:** [`Age.cs`](api/src/BupaBooks.Application/Domain/Age.cs) (18+), [`BookSelection.cs`](api/src/BupaBooks.Application/Domain/BookSelection.cs) and [`BookOrdering.cs`](api/src/BupaBooks.Application/Domain/BookOrdering.cs). Pure functions, unit-tested at the 17/18 boundary against the live data.
-4. **The interesting engineering is at the edges:**
+2. **Assumptions:** listed in [Assumptions](#assumptions), as the brief asks. The reasoning behind the bigger ones is in the [ADRs](docs/adr).
+3. **Requirements → code:** see [the table below](#how-the-requirements-map-to-the-code). Every requirement points at the code and the test that proves it.
+4. **The business rules:** [`Age.cs`](api/src/BupaBooks.Application/Domain/Age.cs) (18+), [`BookSelection.cs`](api/src/BupaBooks.Application/Domain/BookSelection.cs) and [`BookOrdering.cs`](api/src/BupaBooks.Application/Domain/BookOrdering.cs). Pure functions, unit-tested at the 17/18 boundary against the live data.
+5. **The interesting engineering is at the edges:**
    - The Bupa API is rate-limited and intermittently returns empty `200`s. See [`DependencyInjection.cs`](api/src/BupaBooks.Infrastructure/DependencyInjection.cs) (retry, bulkhead, circuit breaker), [`EmptyResponseGuardHandler.cs`](api/src/BupaBooks.Infrastructure/BupaApi/EmptyResponseGuardHandler.cs) and [`BupaBookOwnerSource.cs`](api/src/BupaBooks.Infrastructure/BupaBookOwnerSource.cs) (cache + last-known-good fallback).
    - Inbound protection is in [`Program.cs`](api/src/BupaBooks.Host/Program.cs).
-5. **One contract, two languages:** the server generates [`openapi/bupa-books.json`](api/src/BupaBooks.Host/openapi/bupa-books.json) at build time. The client generates [`schema.d.ts`](web/src/api/schema.d.ts) from it, and CI fails if either drifts.
-6. **Quality gates:** [what runs where](#quality-gates). Unit, integration, architecture, contract and end-to-end tests (with axe accessibility checks), plus scanning.
-7. **Delivery:** the [Dockerfile](Dockerfile), [workflows](.github/workflows) and [k6 load test](tests/load/books.js).
-8. **Why it is built this way:** eight short [ADRs](#key-decisions).
-9. **How AI was used:** [`docs/ai-assisted-development.md`](docs/ai-assisted-development.md) (decisions I made, AI mistakes and what caught them) and [`AGENTS.md`](AGENTS.md) (the rules AI agents follow in this repo).
+6. **One contract, two languages:** the server generates [`openapi/bupa-books.json`](api/src/BupaBooks.Host/openapi/bupa-books.json) at build time. The client generates [`schema.d.ts`](web/src/api/schema.d.ts) from it, and CI fails if either drifts.
+7. **Quality gates:** [what runs where](#quality-gates). Unit, integration, architecture, contract and end-to-end tests (with axe accessibility checks), plus scanning.
+8. **Delivery:** the [Dockerfile](Dockerfile), [workflows](.github/workflows) and [k6 load test](tests/load/books.js).
+9. **Why it is built this way:** eight short [ADRs](#key-decisions).
+10. **How AI was used:** [`docs/ai-assisted-development.md`](docs/ai-assisted-development.md) (decisions I made, AI mistakes and what caught them) and [`AGENTS.md`](AGENTS.md) (the rules AI agents follow in this repo).
 
 **Deliberately not built** (and why): see [Not built, and why](#not-built-and-why).
 
@@ -62,16 +63,16 @@ npm run e2e:down
 
 ## How the requirements map to the code
 
-| Requirement                                       | Where it lives                                                                                    | Verified by                                      |
-| ------------------------------------------------- | ------------------------------------------------------------------------------------------------- | ------------------------------------------------ |
-| Server side that returns the data                 | `api/` → `GET /api/v1/books?ageCategory=&format=` ([ADR-0004](docs/adr/0004-bff-api-contract.md)) | `Host.IntegrationTests`, E2E                     |
-| Client side that fetches from our server          | `web/src/features/books/api/booksApi.ts` (same-origin `/api`)                                     | `booksApi.test.ts`, `App.test.tsx`, E2E          |
-| Must be a React app                               | `web/`                                                                                            | n/a                                              |
-| Adults ≥ 18, Children ≤ 17                        | `Application/Domain/Age.cs` (`AdultMinimumAge`)                                                   | `AgeTests` (17 and 18 boundaries)                |
-| All books, alphabetical, under their age category | `Application/Domain/BookSelection.cs`, `BookOrdering.cs`                                          | `BookSelectionTests` (live data), E2E            |
-| "Get Books" / "Hardcover only"                    | `web/.../BookControls.tsx` → `?format=hardcover` on the server                                    | `App.test.tsx`, `BookSelectionTests`, E2E        |
-| Dynamic headings                                  | `web/src/features/books/headings.ts`                                                              | `headings.test.ts`, `App.test.tsx`, E2E          |
-| 600px breakpoint, `#0079c8`, reference layout     | `web/src/index.css` (mobile-first, `@media (min-width: 600px)`)                                   | E2E layout tests on desktop and mobile viewports |
+| Requirement                                       | Where it lives                                                                                    | Verified by                                                              |
+| ------------------------------------------------- | ------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------ |
+| Server side that returns the data                 | `api/` → `GET /api/v1/books?ageCategory=&format=` ([ADR-0004](docs/adr/0004-bff-api-contract.md)) | `Host.IntegrationTests`, E2E                                             |
+| Client side that fetches from our server          | `web/src/features/books/api/booksApi.ts` (same-origin `/api`)                                     | `booksApi.test.ts`, `App.test.tsx`, E2E                                  |
+| Must be a React app                               | `web/`                                                                                            | n/a                                                                      |
+| Adults ≥ 18, Children ≤ 17                        | `Application/Domain/Age.cs` (`AdultMinimumAge`)                                                   | `AgeTests` (17 and 18 boundaries)                                        |
+| All books, alphabetical, under their age category | `Application/Domain/BookSelection.cs`, `BookOrdering.cs`                                          | `BookSelectionTests` (live data), E2E                                    |
+| "Get Books" / "Hardcover only"                    | `web/.../BookControls.tsx` → `?format=hardcover` on the server                                    | `App.test.tsx`, `BookSelectionTests`, E2E                                |
+| Dynamic headings                                  | `web/src/features/books/headings.ts`                                                              | `headings.test.ts`, `App.test.tsx`, E2E                                  |
+| 600px breakpoint, `#0079c8`, reference layout     | `web/src/index.css` (mobile-first, `@media (min-width: 600px)`)                                   | E2E: layout at exactly 599px and 600px, brand colour, desktop and mobile |
 
 ## Architecture
 

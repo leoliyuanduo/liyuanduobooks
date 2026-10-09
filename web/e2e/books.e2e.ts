@@ -152,6 +152,28 @@ test.describe('Exactly at the 600px breakpoint', () => {
   });
 });
 
+/** The brief: "The blue colour used throughout the app is #0079c8". */
+test.describe('Brand colour', () => {
+  const BRAND_BLUE = 'rgb(0, 121, 200)'; // #0079c8, as the browser reports computed colours
+
+  test('the title bar, card headings, button and link use #0079c8', async ({ page }) => {
+    await page.goto('/?view=all');
+    await expect(page.getByRole('heading', { name: 'Books owned by Adults' })).toBeVisible();
+
+    await expect(page.locator('.app-header')).toHaveCSS('background-color', BRAND_BLUE);
+    await expect(page.getByRole('heading', { name: 'Books owned by Adults' })).toHaveCSS(
+      'background-color',
+      BRAND_BLUE,
+    );
+    await expect(page.getByRole('heading', { name: 'Books owned by Children' })).toHaveCSS(
+      'background-color',
+      BRAND_BLUE,
+    );
+    await expect(page.getByRole('button', { name: 'Get Books' })).toHaveCSS('background-color', BRAND_BLUE);
+    await expect(page.getByRole('button', { name: 'Hardcover only' })).toHaveCSS('color', BRAND_BLUE);
+  });
+});
+
 test.describe('Production hardening', () => {
   test('the page is served with security headers', async ({ request }) => {
     const response = await request.get('/');
