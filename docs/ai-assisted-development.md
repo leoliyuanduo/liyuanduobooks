@@ -1,0 +1,49 @@
+# How AI was used to build this
+
+I built this solution with an AI coding assistant (Claude). This page records how: what the AI did, what I decided, and the AI mistakes that were caught before they reached `main`. The role I am applying for asks for people who "guide and constrain agentic tooling" and "review, validate and refine outputs produced by AI systems", so the process matters as much as the result.
+
+## The working loop
+
+1. **Understand the problem from evidence, not assumptions.** We read the challenge page, called the live API and its Swagger document, and probed the upstream's behaviour before designing anything.
+2. **Decide, then write it down.** Each significant decision was discussed, chosen by me, and recorded as an ADR (`docs/adr`) before or alongside the code.
+3. **Contract first.** The API contract (ADR-0004) was agreed before implementation. The server generates its OpenAPI document; the client generates its TypeScript types from it.
+4. **Small, reviewable commits.** The AI drafted code in logical steps (Conventional Commits); I reviewed each change.
+5. **Automated gates decide, not confidence.** Strict compilers, tests at every level, architecture tests, contract drift checks, vulnerability audits and E2E. AI-written code has to pass exactly the same gates as mine.
+6. **I verify on my machine.** The assistant's sandbox could not compile .NET, so none of the C# was considered working until I built and tested it locally and reported back the failures.
+
+## Decisions I made
+
+| Decision                              | What happened                                                                                                                                                                                                                                                             |
+| ------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Add a .NET backend (BFF)              | The first version was a React-only app. I asked whether it had a backend, weighed the trade-offs, and chose an ASP.NET Core BFF so the business rules live in one tested place. The updated brief later made a server side mandatory.                                     |
+| Clean architecture, three projects    | I wanted Host / Application / Infrastructure without a separate Domain project. The AI pointed out that the domain model cannot live in Infrastructure (it would create a circular reference), so the domain is a folder in Application, protected by architecture tests. |
+| API shape                             | I proposed an owner-centric response with ids and paging. We compared it with a books collection; I chose the filterable, paged books collection because it keeps the rules on the server, keeps personal data off the wire, and pages correctly.                         |
+| Identifiers                           | The AI argued against assuming upstream ids. I kept the assumption, because the brief says the data is only "similar to" the example, and we made it safe: ids are optional, with deterministic derived ids as a fallback.                                                |
+| Share the contract by code generation | My suggestion: generate the schema from .NET and the client types from that, with CI drift checks, rather than hand-written contract tests.                                                                                                                               |
+| Rate limiting and resilience          | I asked for per-IP rate limiting and protection against cascading failure.                                                                                                                                                                                                |
+| Trim the scope                        | Terraform for Azure and a Power Platform connector were prototyped. I removed both: for a one-screen challenge they added more to explain than they proved (ADR-0008).                                                                                                    |
+
+## AI mistakes, and what caught them
+
+| What the AI got wrong                                                                                                                 | Caught by                                                       | Fix                                                                                        |
+| ------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------- | ------------------------------------------------------------------------------------------ |
+| Guessed NuGet package versions; two had published vulnerabilities (`Microsoft.OpenApi` 2.0.0, high; `OpenTelemetry` 1.10.0, moderate) | NuGet audit failing my local build (warnings are errors)        | Read the advisories, moved to patched versions                                             |
+| Parsed upstream JSON with web defaults, which silently accepted `"age": "30"` as a number                                             | A unit test failing on my machine                               | Strict number handling: a type change upstream is rejected and logged                      |
+| The circuit breaker used the library default (at least 100 calls per window), which would never trip at this traffic                  | Design review                                                   | Tuned to 5 calls and a 50% failure ratio                                                   |
+| Retries did not cover the upstream's intermittent `200 OK` with an empty body                                                         | Probing the live API repeatedly                                 | A handler inside the retry pipeline treats empty bodies as transient failures; tests added |
+| The generated OpenAPI described query parameters as plain strings and numbers as `integer \| string`                                  | Reviewing the generated contract before generating client types | An operation transformer publishes the real enums and bounds; strict number handling       |
+| Nearly used `KnownNetworks`, which is obsolete in .NET 10 (a build error with warnings as errors)                                     | Checking the ASP.NET Core source before writing the code        | Used `KnownIPNetworks`                                                                     |
+| The committed OpenAPI document differed from the build output by one trailing newline                                                 | Comparing it with my local build output                         | Commit the file exactly as generated                                                       |
+| Some GitHub Action tags resolved to tag objects, not commits, when pinning by SHA                                                     | Resolving the peeled commit SHAs                                | Pinned every action to its real commit SHA                                                 |
+
+## What this shows
+
+- AI made me faster at drafting, exploring options and writing tests, but its output was treated as a **proposal**: every mistake above was plausible-looking code that compiled in someone's head.
+- The defects were caught by **evidence** (live API probes, library sources, advisories) and **automated gates** (compiler, audits, tests, drift checks), not by trusting the output.
+- I own every line committed under my name, whoever or whatever typed it.
+
+## Running this in a team
+
+- [`AGENTS.md`](../AGENTS.md) (and `.github/copilot-instructions.md`) give every AI agent the same rules: architecture boundaries, generated files never to edit, privacy rules, commands to run, and changes that need human approval.
+- The pull request template asks the author to confirm they reviewed every AI-generated line.
+- The same CI gates apply to every pull request, whoever (or whatever) wrote it.
