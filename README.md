@@ -55,7 +55,9 @@ dotnet test --filter "Category=LiveContract"    # checks the real Bupa API still
 
 cd web
 npm run ci                                      # API types in sync, format, lint, typecheck, tests + coverage gate, build
-npm run e2e                                     # Playwright against http://localhost:8080 (start the e2e compose stack first)
+npm run e2e:up                                  # starts the offline stack (stub upstream, relaxed rate limit)
+npm run e2e                                     # Playwright E2E + axe, desktop and mobile, incl. 599/600px breakpoint
+npm run e2e:down
 ```
 
 ## How the requirements map to the code

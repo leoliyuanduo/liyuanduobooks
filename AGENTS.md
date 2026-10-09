@@ -13,7 +13,7 @@ cd api && dotnet build && dotnet test --filter "Category!=LiveContract"
 cd web && npm run ci              # API types in sync, format, lint, typecheck, tests + coverage, build
 ```
 
-E2E (needs Docker): `docker compose -f compose.yaml -f tests/compose.e2e.yaml up --build -d`, then `cd web && npm run e2e`.
+E2E (needs Docker): `cd web && npm run e2e:up && npm run e2e && npm run e2e:down`. Always use the e2e stack: against plain `docker compose up`, our own rate limiter throttles the test burst (429s).
 
 Never claim a change works without running these. If you could not run them, say so explicitly.
 

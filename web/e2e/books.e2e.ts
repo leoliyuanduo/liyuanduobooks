@@ -106,6 +106,7 @@ test.describe('Responsive layout (600px breakpoint)', () => {
 
   test('cards are side by side on desktop and stacked on mobile', async ({ page, isMobile }) => {
     await page.goto('/?view=all');
+    await expect(page.getByRole('heading', { name: 'Books owned by Children' })).toBeVisible();
     const adults = await page.getByRole('region', { name: 'Books owned by Adults' }).boundingBox();
     const children = await page.getByRole('region', { name: 'Books owned by Children' }).boundingBox();
 
@@ -114,6 +115,40 @@ test.describe('Responsive layout (600px breakpoint)', () => {
     } else {
       expect(Math.abs(children!.y - adults!.y)).toBeLessThan(5);
     }
+  });
+});
+
+/**
+ * The brief: "The mobile breakpoint is 600px". Test both sides of the line, not just
+ * a phone and a wide desktop: a mistake such as min-width: 640px would pass those.
+ */
+test.describe('Exactly at the 600px breakpoint', () => {
+  test.beforeEach(({ isMobile }) => {
+    test.skip(isMobile, 'viewport widths are set explicitly; one browser profile is enough');
+  });
+
+  async function layoutAt(page: Page, width: number) {
+    await page.setViewportSize({ width, height: 900 });
+    await page.goto('/?view=all');
+    await expect(page.getByRole('heading', { name: 'Books owned by Children' })).toBeVisible();
+
+    const adults = (await page.getByRole('region', { name: 'Books owned by Adults' }).boundingBox())!;
+    const children = (await page.getByRole('region', { name: 'Books owned by Children' }).boundingBox())!;
+    const button = (await page.getByRole('button', { name: 'Get Books' }).boundingBox())!;
+    const link = (await page.getByRole('button', { name: 'Hardcover only' }).boundingBox())!;
+
+    return {
+      cardsSideBySide: Math.abs(children.y - adults.y) < 5,
+      controlsInOneRow: Math.abs(link.y - button.y) < 20,
+    };
+  }
+
+  test('599px wide uses the mobile layout (stacked)', async ({ page }) => {
+    expect(await layoutAt(page, 599)).toEqual({ cardsSideBySide: false, controlsInOneRow: false });
+  });
+
+  test('600px wide uses the desktop layout (side by side)', async ({ page }) => {
+    expect(await layoutAt(page, 600)).toEqual({ cardsSideBySide: true, controlsInOneRow: true });
   });
 });
 

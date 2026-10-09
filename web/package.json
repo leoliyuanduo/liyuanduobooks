@@ -17,7 +17,9 @@
     "ci": "npm run format:check && npm run lint && npm run typecheck && npm run test:coverage && vite build",
     "generate:api": "openapi-typescript ../api/src/BupaBooks.Host/openapi/bupa-books.json -o src/api/schema.d.ts",
     "check:api": "npm run generate:api && git diff --exit-code -- src/api/schema.d.ts",
-    "e2e": "playwright test"
+    "e2e": "playwright test",
+    "e2e:up": "docker compose -f ../compose.yaml -f ../tests/compose.e2e.yaml up --build --detach --wait",
+    "e2e:down": "docker compose -f ../compose.yaml -f ../tests/compose.e2e.yaml down"
   },
   "dependencies": {
     "@tanstack/react-query": "^5.104.1",
