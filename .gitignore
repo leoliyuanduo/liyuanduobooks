@@ -1,41 +1,44 @@
-# Logs
-logs
+# ---------- Dependencies ----------
+node_modules/
+
+# ---------- Build output ----------
+dist/
+dist-ssr/
+bin/
+obj/
+
+# ---------- Test output ----------
+coverage/
+TestResults/
+playwright-report/
+test-results/
+*.trx
+
+# ---------- Logs ----------
+logs/
 *.log
 npm-debug.log*
-yarn-debug.log*
-yarn-error.log*
-pnpm-debug.log*
-lerna-debug.log*
+*.binlog
 
-node_modules
-dist
-dist-ssr
-*.local
-
-# Editor directories and files
-.vscode/*
-!.vscode/extensions.json
-.idea
-.DS_Store
-*.suo
-*.ntvs*
-*.njsproj
-*.sln
-*.sw?
-
-coverage
+# ---------- Secrets and local settings (never commit) ----------
 .env
 .env.*
 !.env.example
-
-# .NET
-bin/
-obj/
+*.local
 *.user
+appsettings.*.local.json
+secrets.json
+
+# ---------- Editors and OS ----------
 .vs/
-TestResults/
+.idea/
+.vscode/*
+!.vscode/extensions.json
+*.suo
+*.sw?
+.DS_Store
+Thumbs.db
 
-# Playwright
-playwright-report/
-test-results/
-
+# ---------- Local delivery files ----------
+*.bundle
+*.zip
