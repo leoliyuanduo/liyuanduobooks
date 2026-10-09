@@ -47,16 +47,34 @@ builder.Services.AddExceptionHandler<BookSourceExceptionHandler>();
 
 // ---- Edge protection: who is calling, how often, and for how long. ----
 
-// Behind a reverse proxy (Front Door, App Gateway, nginx) the client IP arrives in
-// X-Forwarded-For. Only proxies listed in ForwardedHeaders:KnownProxies are trusted;
-// otherwise any caller could spoof the header and dodge the per-IP rate limit.
+// Behind a reverse proxy (Front Door, Container Apps ingress, nginx) the client IP arrives in
+// X-Forwarded-For. It is only honoured from trusted proxies; otherwise any caller could spoof
+// the header and get a fresh rate-limit bucket per request. Configure ONE of:
+//   ForwardedHeaders:KnownProxies   fixed proxy IPs
+//   ForwardedHeaders:KnownNetworks  proxy subnets (CIDR)
+//   ForwardedHeaders:TrustAllProxies  only when the app is unreachable except through the proxy
+//                                     (e.g. Azure Container Apps, where ingress IPs are dynamic)
+var forwardedHeaders = builder.Configuration.GetSection("ForwardedHeaders");
 builder.Services.Configure<ForwardedHeadersOptions>(options =>
 {
     options.ForwardedHeaders = ForwardedHeaders.XForwardedFor | ForwardedHeaders.XForwardedProto;
-    options.ForwardLimit = 1;
-    foreach (var proxy in builder.Configuration.GetSection("ForwardedHeaders:KnownProxies").Get<string[]>() ?? [])
+    options.ForwardLimit = 1; // only the hop added by our own proxy
+
+    if (forwardedHeaders.GetValue<bool>("TrustAllProxies"))
+    {
+        options.KnownProxies.Clear();
+        options.KnownIPNetworks.Clear();
+        return;
+    }
+
+    foreach (var proxy in forwardedHeaders.GetSection("KnownProxies").Get<string[]>() ?? [])
     {
         options.KnownProxies.Add(IPAddress.Parse(proxy));
+    }
+
+    foreach (var network in forwardedHeaders.GetSection("KnownNetworks").Get<string[]>() ?? [])
+    {
+        options.KnownIPNetworks.Add(System.Net.IPNetwork.Parse(network));
     }
 });
 

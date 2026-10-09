@@ -1,0 +1,18 @@
+# Keep the build context small and free of local artefacts and secrets.
+.git
+.github
+**/node_modules
+**/bin
+**/obj
+**/dist
+**/coverage
+**/TestResults
+**/playwright-report
+**/test-results
+**/.env
+**/.env.*
+!**/.env.example
+docs
+infra
+load
+integrations

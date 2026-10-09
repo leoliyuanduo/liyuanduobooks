@@ -1,0 +1,20 @@
+# Deterministic end-to-end environment: the real app image, with the Bupa API replaced by
+# a stub serving the captured live payload. E2E tests then test OUR system, not the
+# availability of a rate-limited third party.
+#   docker compose -f compose.yaml -f compose.e2e.yaml up --build -d
+services:
+  upstream-stub:
+    image: nginx:1.27-alpine
+    volumes:
+      - ./docker/upstream-stub/nginx.conf:/etc/nginx/conf.d/default.conf:ro
+      - ./api/tests/TestData/bookowners.json:/data/bookowners.json:ro
+
+  app:
+    depends_on:
+      - upstream-stub
+    environment:
+      BupaApi__BaseUrl: http://upstream-stub/
+      # E2E runs many requests from one IP; raise the limit so tests exercise features, not throttling
+      # (rate limiting itself is covered by the API integration tests). The load test raises it further.
+      RateLimiting__PermitLimit: "${E2E_RATE_LIMIT:-1000}"
+      RateLimiting__TokensPerPeriod: "${E2E_RATE_LIMIT:-1000}"

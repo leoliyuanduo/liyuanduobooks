@@ -1,0 +1,22 @@
+# Run the whole app with one command:  docker compose up --build
+# Then open http://localhost:8080
+name: bupa-books
+
+services:
+  app:
+    build: .
+    image: bupa-books:local
+    ports:
+      - "8080:8080"
+    environment:
+      ASPNETCORE_ENVIRONMENT: Production
+      # Behind a real reverse proxy, list its address here so client IPs (rate limiting) are trusted.
+      # ForwardedHeaders__KnownProxies__0: "10.0.0.4"
+    # Defence in depth: the app needs no writable filesystem and no Linux capabilities.
+    read_only: true
+    tmpfs:
+      - /tmp
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
