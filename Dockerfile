@@ -41,5 +41,5 @@ EXPOSE 8080
 USER $APP_UID
 
 # No HEALTHCHECK: a distroless image has no curl/shell to run one. The orchestrator probes
-# /health/live and /health/ready over HTTP instead (see infra/terraform and compose files).
+# /health/live and /health/ready over HTTP instead.
 ENTRYPOINT ["dotnet", "BupaBooks.Host.dll"]

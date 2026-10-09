@@ -13,6 +13,4 @@
 **/.env.*
 !**/.env.example
 docs
-infra
 tests
-integrations

@@ -47,7 +47,7 @@ builder.Services.AddExceptionHandler<BookSourceExceptionHandler>();
 
 // ---- Edge protection: who is calling, how often, and for how long. ----
 
-// Behind a reverse proxy (Front Door, Container Apps ingress, nginx) the client IP arrives in
+// Behind a reverse proxy (Front Door, Azure Container Apps ingress, nginx) the client IP arrives in
 // X-Forwarded-For. It is only honoured from trusted proxies; otherwise any caller could spoof
 // the header and get a fresh rate-limit bucket per request. Configure ONE of:
 //   ForwardedHeaders:KnownProxies   fixed proxy IPs

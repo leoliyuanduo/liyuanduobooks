@@ -16,8 +16,9 @@ A React app with its own server. The **server** (an ASP.NET Core BFF) fetches th
    - Inbound protection is in [`Program.cs`](api/src/BupaBooks.Host/Program.cs).
 5. **One contract, two languages:** the server generates [`openapi/bupa-books.json`](api/src/BupaBooks.Host/openapi/bupa-books.json) at build time. The client generates [`schema.d.ts`](web/src/api/schema.d.ts) from it, and CI fails if either drifts.
 6. **Quality gates:** [what runs where](#quality-gates). Unit, integration, architecture, contract and end-to-end tests (with axe accessibility checks), plus scanning.
-7. **Delivery:** the [Dockerfile](Dockerfile), [workflows](.github/workflows), [Terraform](infra/terraform) and [k6 load test](tests/load/books.js).
+7. **Delivery:** the [Dockerfile](Dockerfile), [workflows](.github/workflows) and [k6 load test](tests/load/books.js).
 8. **Why it is built this way:** eight short [ADRs](#key-decisions).
+9. **How AI was used:** [`docs/ai-assisted-development.md`](docs/ai-assisted-development.md) (decisions I made, AI mistakes and what caught them) and [`AGENTS.md`](AGENTS.md) (the rules AI agents follow in this repo).
 
 **Deliberately not built** (and why): see [Not built, and why](#not-built-and-why).
 
@@ -124,40 +125,34 @@ web/src/
 | ------------------------------------------------------------------------ | ------------------------------------- | ---------------- |
 | C# warnings as errors, nullable, analyzers, NuGet vulnerability audit    | `api-ci.yml`                          | every PR         |
 | Unit, adapter, integration (`WebApplicationFactory`), architecture tests | `api-ci.yml`                          | every PR         |
-| OpenAPI drift, client type drift, Power Platform connector drift         | `api-ci.yml`, `web-ci.yml`            | every PR         |
+| OpenAPI drift, client type drift                                         | `api-ci.yml`, `web-ci.yml`            | every PR         |
 | TypeScript strict, lint (0 warnings), Prettier, 90%/85% coverage gate    | `web-ci.yml`                          | every PR         |
 | E2E on the real image: desktop + mobile, axe WCAG 2.2 AA                 | `container.yml`                       | every PR         |
 | Image scan (Trivy, HIGH/CRITICAL), SBOM                                  | `container.yml`                       | every PR         |
 | CodeQL (C#, TypeScript), dependency review (vulnerabilities, licences)   | `codeql.yml`, `dependency-review.yml` | every PR, weekly |
-| Terraform fmt/validate, tflint, checkov                                  | `infra-ci.yml`                        | infra PRs        |
 | Live upstream contract check                                             | `upstream-contract.yml`               | daily            |
 | Load test (p95 < 250 ms, < 1% errors)                                    | `load-test.yml`                       | on demand        |
 
-All GitHub Actions are **pinned to commit SHAs**; Dependabot keeps actions, NuGet, npm, Docker base images and Terraform providers current.
+All GitHub Actions are **pinned to commit SHAs**; Dependabot keeps actions, NuGet, npm and Docker base images current.
 
 ## Delivery
 
 - **Image:** multi-stage [Dockerfile](Dockerfile). Node builds the client, the .NET SDK publishes the server, and the runtime is `aspnet:10.0-noble-chiseled-extra` (distroless, non-root, with ICU for `en-AU` sorting).
-- **Pipeline** ([ADR-0008](docs/adr/0008-delivery-pipeline.md)): PR checks → on `main`, the image that passed E2E and scanning is pushed to GHCR, tagged by commit SHA, with provenance and an SBOM → [`deploy.yml`](.github/workflows/deploy.yml) applies Terraform to **Azure Container Apps** behind a manual approval, authenticated with **OIDC** (no stored cloud secrets), then smoke-tests the URL.
-- **Infrastructure:** [`infra/terraform`](infra/terraform), with least privilege (the deploy identity is Contributor on one resource group only). Setup and status are in [`infra/README.md`](infra/README.md).
+- **Pipeline** ([ADR-0008](docs/adr/0008-delivery-pipeline.md)): PR checks → on `main`, the exact image that passed E2E and scanning is pushed to GitHub Container Registry, tagged by commit SHA, with provenance and an SBOM. Any container host can run it: it listens on 8080 and exposes `/health/live` and `/health/ready` probes.
 - **Load test:** [`tests/load/books.js`](tests/load/books.js) (k6, 50 virtual users) runs against the real image with a stubbed upstream; results are published to the job summary.
-
-## Power Platform
-
-The API's OpenAPI contract doubles as a **Power Platform custom connector** ([`integrations/power-platform`](integrations/power-platform)). Canvas or Code Apps, Power Automate flows and **Copilot Studio agents** can use the same business rules and protections without re-implementing them in low-code. CI checks that the connector stays in sync with the API.
 
 ## Key decisions
 
-| ADR                                                            | Decision                                                                           |
-| -------------------------------------------------------------- | ---------------------------------------------------------------------------------- |
-| [0001](docs/adr/0001-technology-choice.md)                     | React + TypeScript + Vite client                                                   |
-| [0002](docs/adr/0002-same-origin-api-proxy.md)                 | Browser only calls same-origin `/api` (served by our BFF)                          |
-| [0003](docs/adr/0003-runtime-validation.md)                    | Validate untrusted upstream data, skip bad records (in the BFF)                    |
-| [0004](docs/adr/0004-bff-api-contract.md)                      | API contract: filterable, paged books collection; no owner data; id assumption     |
-| [0005](docs/adr/0005-bff-clean-architecture.md)                | Three-project clean architecture; domain in Application, enforced by tests         |
-| [0006](docs/adr/0006-upstream-behaviour.md)                    | Upstream is rate-limited and intermittently returns empty bodies: retry and cache  |
-| [0007](docs/adr/0007-edge-protection-and-cascading-failure.md) | Per-IP rate limit, security headers, bulkhead, circuit breaker, stale fallback     |
-| [0008](docs/adr/0008-delivery-pipeline.md)                     | One distroless image; tested image is shipped image; OIDC deploy to Container Apps |
+| ADR                                                            | Decision                                                                          |
+| -------------------------------------------------------------- | --------------------------------------------------------------------------------- |
+| [0001](docs/adr/0001-technology-choice.md)                     | React + TypeScript + Vite client                                                  |
+| [0002](docs/adr/0002-same-origin-api-proxy.md)                 | Browser only calls same-origin `/api` (served by our BFF)                         |
+| [0003](docs/adr/0003-runtime-validation.md)                    | Validate untrusted upstream data, skip bad records (in the BFF)                   |
+| [0004](docs/adr/0004-bff-api-contract.md)                      | API contract: filterable, paged books collection; no owner data; id assumption    |
+| [0005](docs/adr/0005-bff-clean-architecture.md)                | Three-project clean architecture; domain in Application, enforced by tests        |
+| [0006](docs/adr/0006-upstream-behaviour.md)                    | Upstream is rate-limited and intermittently returns empty bodies: retry and cache |
+| [0007](docs/adr/0007-edge-protection-and-cascading-failure.md) | Per-IP rate limit, security headers, bulkhead, circuit breaker, stale fallback    |
+| [0008](docs/adr/0008-delivery-pipeline.md)                     | One distroless image; the tested image is the shipped image, tagged by commit SHA |
 
 ## Assumptions
 
@@ -181,22 +176,23 @@ The API's OpenAPI contract doubles as a **Power Platform custom connector** ([`i
 - **Freshness:** data can be up to 5 minutes old (cache), or up to 1 hour during an upstream outage. Acceptable for a book list; both values are configuration.
 - **Scale:** single region, modest traffic. The rate limits are starting values to tune against real traffic.
 - **Browsers:** current evergreen browsers (last two versions). **Accessibility:** WCAG 2.2 AA. **Language:** English only.
-- **Deployment:** behind a TLS-terminating proxy that is configured as trusted (Container Apps ingress in the provided Terraform).
+- **Deployment:** behind a TLS-terminating reverse proxy, configured as trusted (`ForwardedHeaders` settings) so the rate limit sees real client IPs.
 
 ## Not built, and why
 
-| Not built                          | Why / what it would take                                                                                        |
-| ---------------------------------- | --------------------------------------------------------------------------------------------------------------- |
-| Authentication (OAuth2/OIDC)       | The data is public and read-only. The endpoint group is ready for `.RequireAuthorization()` with Entra ID.      |
-| Distributed cache / rate limiting  | One replica is enough here. With more: Redis behind `HybridCache` (one line), rate limiting at Front Door/APIM. |
-| Application Insights wiring        | OpenTelemetry is in place and exports over OTLP when configured; logs already reach Log Analytics.              |
-| Mutation testing, visual snapshots | Useful at team scale (Stryker.NET / StrykerJS, Playwright snapshots); low value for one screen.                 |
-| Multi-region, Kubernetes           | Over-engineering for one read-only screen; Container Apps covers scaling and revisions.                         |
+| Not built                          | Why / what it would take                                                                                                          |
+| ---------------------------------- | --------------------------------------------------------------------------------------------------------------------------------- |
+| Authentication (OAuth2/OIDC)       | The data is public and read-only. The endpoint group is ready for `.RequireAuthorization()` with Entra ID.                        |
+| Distributed cache / rate limiting  | One replica is enough here. With more: Redis behind `HybridCache` (one line), rate limiting at Front Door/APIM.                   |
+| Cloud deployment (IaC + CD)        | Out of scope for a one-screen challenge; the image is ready for any host (e.g. Azure Container Apps via Terraform). See ADR-0008. |
+| Application Insights wiring        | OpenTelemetry is in place and exports over OTLP when configured; structured JSON logs go to stdout.                               |
+| Mutation testing, visual snapshots | Useful at team scale (Stryker.NET / StrykerJS, Playwright snapshots); low value for one screen.                                   |
+| Multi-region, Kubernetes           | Over-engineering for one read-only screen; a managed container host covers scaling.                                               |
 
 ## Use of AI tooling
 
-This solution was built with an AI coding assistant, under the same rules I would apply in a team:
+Built with an AI coding assistant, under the same rules I would apply in a team. Full account: [`docs/ai-assisted-development.md`](docs/ai-assisted-development.md); agent rules: [`AGENTS.md`](AGENTS.md).
 
-- **Grounded in evidence:** the live API, its Swagger document and the challenge page were inspected before designing. The missing schema, the empty responses and the rate limiting each drove a design decision. Library APIs and container tags were checked against their sources, not assumed.
-- **Constrained by guardrails:** strict compilers on both sides, vulnerability audits, lint with zero warnings, coverage thresholds, architecture tests, contract drift checks, E2E and accessibility tests, and scanning on every PR. Generated code passes the same gates as hand-written code. Those gates caught real defects: vulnerable package versions, lenient JSON number parsing, a deprecated .NET API.
-- **Reviewed by a person:** I reviewed every line and can explain it. I am accountable for everything committed under my name, whoever or whatever typed it.
+- **Grounded in evidence:** the live API, its Swagger document and the challenge page were inspected before designing. Library APIs and container tags were checked against their sources, not assumed.
+- **Constrained by guardrails:** strict compilers, vulnerability audits, architecture tests, contract drift checks, E2E and accessibility tests on every PR. These gates caught real AI mistakes: vulnerable package versions, lenient JSON number parsing, a deprecated .NET API.
+- **Reviewed by a person:** I made the design decisions, built and tested every change on my machine, and can explain every line. I am accountable for everything committed under my name.

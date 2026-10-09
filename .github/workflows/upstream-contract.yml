@@ -5,7 +5,7 @@ name: Upstream contract check
 # investigate before users notice.
 on:
   schedule:
-    - cron: '17 21 * * *' # daily, ~08:17 Sydney time
+    - cron: "17 21 * * *" # daily, ~08:17 Sydney time
   workflow_dispatch:
 
 permissions:

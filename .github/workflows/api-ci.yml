@@ -2,10 +2,10 @@ name: API CI
 
 on:
   pull_request:
-    paths: ['api/**', 'integrations/**', '.github/workflows/api-ci.yml']
+    paths: ["api/**", ".github/workflows/api-ci.yml"]
   push:
     branches: [main]
-    paths: ['api/**', 'integrations/**', '.github/workflows/api-ci.yml']
+    paths: ["api/**", ".github/workflows/api-ci.yml"]
 
 permissions:
   contents: read
@@ -45,10 +45,6 @@ jobs:
             echo "::error::OpenAPI document is out of date. Run 'dotnet build' and commit src/BupaBooks.Host/openapi/."
             exit 1
           fi
-
-      - name: Power Platform connector matches the contract
-        working-directory: .
-        run: node integrations/power-platform/check-sync.mjs
 
       # Live upstream calls are excluded here (flaky by nature); they run on a schedule instead.
       - name: Test

@@ -7,7 +7,7 @@ on:
   push:
     branches: [main]
   schedule:
-    - cron: '23 20 * * 1' # weekly, so new queries run against unchanged code too
+    - cron: "23 20 * * 1" # weekly, so new queries run against unchanged code too
 
 permissions:
   contents: read

@@ -4,10 +4,30 @@ name: Container
 # publishes it with provenance and an SBOM. The image tested is the image shipped.
 on:
   pull_request:
-    paths: ['api/**', 'web/**', 'tests/compose.e2e.yaml', 'tests/upstream-stub/**', 'Dockerfile', '.dockerignore', 'compose*.yaml', '.github/workflows/container.yml']
+    paths:
+      [
+        "api/**",
+        "web/**",
+        "tests/compose.e2e.yaml",
+        "tests/upstream-stub/**",
+        "Dockerfile",
+        ".dockerignore",
+        "compose*.yaml",
+        ".github/workflows/container.yml",
+      ]
   push:
     branches: [main]
-    paths: ['api/**', 'web/**', 'tests/compose.e2e.yaml', 'tests/upstream-stub/**', 'Dockerfile', '.dockerignore', 'compose*.yaml', '.github/workflows/container.yml']
+    paths:
+      [
+        "api/**",
+        "web/**",
+        "tests/compose.e2e.yaml",
+        "tests/upstream-stub/**",
+        "Dockerfile",
+        ".dockerignore",
+        "compose*.yaml",
+        ".github/workflows/container.yml",
+      ]
   workflow_dispatch:
 
 permissions:
@@ -76,7 +96,7 @@ jobs:
         with:
           image-ref: bupa-books:local
           format: table
-          exit-code: '1'
+          exit-code: "1"
           ignore-unfixed: true
           severity: CRITICAL,HIGH
 

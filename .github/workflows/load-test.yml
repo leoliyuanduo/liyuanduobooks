@@ -14,7 +14,7 @@ jobs:
     timeout-minutes: 15
     env:
       COMPOSE: docker compose -f compose.yaml -f tests/compose.e2e.yaml
-      E2E_RATE_LIMIT: '1000000' # one load generator = one IP; measure throughput, not throttling
+      E2E_RATE_LIMIT: "1000000" # one load generator = one IP; measure throughput, not throttling
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
