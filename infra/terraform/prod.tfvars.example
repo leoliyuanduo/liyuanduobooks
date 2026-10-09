@@ -1,0 +1,9 @@
+# Non-secret settings for production. The image is supplied by the deploy pipeline.
+resource_group_name = "rg-bupabooks-prod"
+name_prefix         = "bupabooks-prod"
+min_replicas        = 1
+max_replicas        = 3
+tags = {
+  environment = "prod"
+  owner       = "platform-team"
+}
