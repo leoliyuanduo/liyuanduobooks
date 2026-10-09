@@ -2,10 +2,10 @@ name: API CI
 
 on:
   pull_request:
-    paths: ['api/**', '.github/workflows/api-ci.yml']
+    paths: ['api/**', 'integrations/**', '.github/workflows/api-ci.yml']
   push:
     branches: [main]
-    paths: ['api/**', '.github/workflows/api-ci.yml']
+    paths: ['api/**', 'integrations/**', '.github/workflows/api-ci.yml']
 
 permissions:
   contents: read
@@ -22,16 +22,17 @@ jobs:
       run:
         working-directory: api
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
-      - uses: actions/setup-dotnet@v4
+      - uses: actions/setup-dotnet@a98b56852c35b8e3190ac28c8c2271da59106c68 # v6.0.0
         with:
           global-json-file: api/global.json
 
       - name: Restore
         run: dotnet restore
 
-      # Warnings are errors (Directory.Build.props), so this also gates nullability and analyzers.
+      # Warnings are errors (Directory.Build.props), so this also gates nullability,
+      # analyzers and the NuGet vulnerability audit.
       - name: Build
         run: dotnet build --no-restore --configuration Release
 
@@ -44,6 +45,10 @@ jobs:
             echo "::error::OpenAPI document is out of date. Run 'dotnet build' and commit src/BupaBooks.Host/openapi/."
             exit 1
           fi
+
+      - name: Power Platform connector matches the contract
+        working-directory: .
+        run: node integrations/power-platform/check-sync.mjs
 
       # Live upstream calls are excluded here (flaky by nature); they run on a schedule instead.
       - name: Test
@@ -62,7 +67,7 @@ jobs:
             exit 1
           fi
 
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         if: always()
         with:
           name: api-test-results

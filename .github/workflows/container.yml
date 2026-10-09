@@ -1,0 +1,132 @@
+name: Container
+
+# Builds the production image, proves it works end to end, scans it, and (on main)
+# publishes it with provenance and an SBOM. The image tested is the image shipped.
+on:
+  pull_request:
+    paths: ['api/**', 'web/**', 'docker/**', 'Dockerfile', '.dockerignore', 'compose*.yaml', '.github/workflows/container.yml']
+  push:
+    branches: [main]
+    paths: ['api/**', 'web/**', 'docker/**', 'Dockerfile', '.dockerignore', 'compose*.yaml', '.github/workflows/container.yml']
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: container-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  COMPOSE: docker compose -f compose.yaml -f compose.e2e.yaml
+
+jobs:
+  build-test-scan:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Build the image and start it with the stubbed upstream
+        run: $COMPOSE up --build --detach
+
+      - name: Wait until the app is ready
+        run: |
+          for attempt in $(seq 1 30); do
+            if curl --fail --silent http://localhost:8080/health/ready > /dev/null; then
+              echo "Ready after $attempt attempt(s)"; exit 0
+            fi
+            sleep 2
+          done
+          $COMPOSE logs app
+          exit 1
+
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version-file: web/.nvmrc
+          cache: npm
+          cache-dependency-path: web/package-lock.json
+
+      - name: Install Playwright
+        working-directory: web
+        run: |
+          npm ci
+          npx playwright install --with-deps chromium
+
+      - name: End-to-end tests (desktop + mobile, axe accessibility)
+        working-directory: web
+        env:
+          E2E_BASE_URL: http://localhost:8080
+        run: npm run e2e
+
+      - name: App logs
+        if: failure()
+        run: $COMPOSE logs app
+
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        if: always()
+        with:
+          name: playwright-report
+          path: web/playwright-report
+          retention-days: 14
+
+      # Fail on HIGH/CRITICAL vulnerabilities that have a fix available.
+      - name: Scan the image for vulnerabilities
+        uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
+        with:
+          image-ref: bupa-books:local
+          format: table
+          exit-code: '1'
+          ignore-unfixed: true
+          severity: CRITICAL,HIGH
+
+      # Software bill of materials: every package in the image, for audit and incident response.
+      - name: Generate SBOM
+        uses: anchore/sbom-action@66cbf4bc1f1c0d2edc94016e65bc221b6bb0ad6c # v0.24.3
+        with:
+          image: bupa-books:local
+          format: spdx-json
+          artifact-name: sbom.spdx.json
+
+      - name: Stop
+        if: always()
+        run: $COMPOSE down
+
+  publish:
+    needs: build-test-scan
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # v4.4.1
+
+      - uses: docker/login-action@dbcb813823bdd20940b903addbd779551569679f # v4.6.0
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - id: meta
+        uses: docker/metadata-action@dc802804100637a589fabce1cb79ff13a1411302 # v6.2.0
+        with:
+          images: ghcr.io/${{ github.repository }}
+          # Immutable, traceable tag per commit; deployments reference this, never "latest".
+          tags: |
+            type=sha,format=long
+            type=raw,value=latest
+
+      - uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc # v7.4.0
+        with:
+          context: .
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          provenance: mode=max
+          sbom: true
+          cache-from: type=gha
+          cache-to: type=gha,mode=max

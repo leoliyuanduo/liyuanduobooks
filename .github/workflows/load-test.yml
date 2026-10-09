@@ -1,0 +1,54 @@
+name: Load test
+
+# On demand: start the real image with a stubbed upstream and run k6 against it.
+# Thresholds in load/books.js are the pass/fail criteria; results go to the job summary.
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  k6:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      COMPOSE: docker compose -f compose.yaml -f compose.e2e.yaml
+      E2E_RATE_LIMIT: '1000000' # one load generator = one IP; measure throughput, not throttling
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Start the app with the stubbed upstream
+        run: |
+          $COMPOSE up --build --detach
+          for attempt in $(seq 1 30); do
+            curl --fail --silent http://localhost:8080/health/ready > /dev/null && exit 0
+            sleep 2
+          done
+          $COMPOSE logs app; exit 1
+
+      - uses: grafana/setup-k6-action@43b9fc21641a76002687994433dd586f56e791b1 # v1.2.2
+
+      - name: Run k6
+        run: k6 run --summary-export=summary.json load/books.js
+
+      - name: Publish results
+        if: always()
+        run: |
+          {
+            echo "## Load test results"
+            echo
+            echo "| Metric | Value |"
+            echo "| --- | --- |"
+            jq -r '
+              "| Requests | \(.metrics.http_reqs.count) |",
+              "| Throughput | \(.metrics.http_reqs.rate | floor) req/s |",
+              "| p95 latency | \(.metrics.http_req_duration["p(95)"] | . * 10 | floor / 10) ms |",
+              "| p99 latency | \(.metrics.http_req_duration["p(99)"] | . * 10 | floor / 10) ms |",
+              "| Failed requests | \(.metrics.http_req_failed.value * 100) % |"
+            ' summary.json
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Stop
+        if: always()
+        run: $COMPOSE down
