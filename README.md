@@ -175,6 +175,15 @@ Nothing here is deployed, so nothing is measured yet. This is what supports each
 **Scope and data**
 
 - **Server and client.** The brief requires "a server side, to return data similar to the above, and a client side, to fetch the data from your server". We read "data similar to the above" as the grouped output: `GET /api/v1/books?ageCategory=…` returns one heading's books, already filtered and sorted.
+- **The business rules belong on the server.** The brief does not say where the rules (18+ = adult, alphabetical order, hardcover filter) should run. We put them all on the server, and the client only sends intent (`ageCategory=adult&format=hardcover`). This gives the server leverage a browser cannot have:
+  - **One source of truth.** Any future client (a mobile app, a Copilot or Power Platform connector built from the OpenAPI document, another team's service) gets the same answer without re-implementing the rules.
+  - **Privacy.** Owner names and ages never leave the server; responses carry only `{ id, title, format }`.
+  - **Resilience and cost.** One cached, rate-limited, retried call to Bupa serves every user, instead of every browser calling a rate-limited upstream directly.
+  - **Change without redeploying clients.** A rule change (say, the adult age) is a server release, tested in one place.
+  - **Testability.** The rules are pure C# functions with unit tests at the 17/18 boundary, independent of any UI.
+
+  The trade-off is one more service to run and one more network hop; for a shared business rule, we judged that worth it ([ADR-0004](docs/adr/0004-bff-api-contract.md), [ADR-0005](docs/adr/0005-bff-clean-architecture.md)).
+
 - **Upstream:** `GET https://digitalcodingtest.bupa.com.au/api/v1/bookowners`, unauthenticated, returning `[{ name, age, books: [{ name, type }] }]`. Its Swagger document declares no response schema, so the server validates every record.
 - **Identifiers.** The upstream data has no ids (confirmed by the live data, Swagger and the reference screenshots). The server derives a deterministic id per owned copy, for list keys, sorting tie-breaks and paging. Clients treat `id` as opaque.
 - **Access:** the book list is public, read-only data, so no sign-in. Owner names and ages are still treated as personal information and never leave the server.
