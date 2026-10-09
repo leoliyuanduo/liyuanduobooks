@@ -138,11 +138,24 @@ web/src/
 
 All GitHub Actions are **pinned to commit SHAs**; Dependabot keeps actions, NuGet, npm and Docker base images current.
 
+**Status:** the build, test and E2E steps were run locally and pass. The workflows themselves have not yet run on GitHub ([details](docs/ai-assisted-development.md#what-i-verified-and-what-i-didnt)).
+
 ## Delivery
 
 - **Image:** multi-stage [Dockerfile](Dockerfile). Node builds the client, the .NET SDK publishes the server, and the runtime is `aspnet:10.0-noble-chiseled-extra` (distroless, non-root, with ICU for `en-AU` sorting).
 - **Pipeline** ([ADR-0008](docs/adr/0008-delivery-pipeline.md)): PR checks → on `main`, the exact image that passed E2E and scanning is pushed to GitHub Container Registry, tagged by commit SHA, with provenance and an SBOM. Any container host can run it: it listens on 8080 and exposes `/health/live` and `/health/ready` probes.
 - **Load test:** [`tests/load/books.js`](tests/load/books.js) (k6, 50 virtual users) runs against the real image with a stubbed upstream; results are published to the job summary.
+
+### Delivery performance (DORA)
+
+Nothing here is deployed, so nothing is measured yet. This is what supports each metric once it is:
+
+| Metric                  | What supports it here                                                                                                                                                                              |
+| ----------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Lead time for changes   | Fast, parallel PR checks; the client's API types are generated, not hand-synced; one command to run everything locally                                                                             |
+| Deployment frequency    | Every merge to `main` produces a scanned, E2E-tested image tagged by commit SHA, ready to deploy                                                                                                   |
+| Change failure rate     | Gates at every level, E2E on the image that ships, and a daily check that the Bupa API still matches our expectations                                                                              |
+| Time to restore service | Health probes; structured logs with correlation ids and OpenTelemetry; the last-known-good fallback keeps the page working during an upstream outage; rollback is redeploying the previous SHA tag |
 
 ## Key decisions
 
@@ -198,4 +211,6 @@ Built with an AI coding assistant, under the same rules I would apply in a team.
 
 - **Grounded in evidence:** the live API, its Swagger document and the challenge page were inspected before designing. Library APIs and container tags were checked against their sources, not assumed.
 - **Constrained by guardrails:** strict compilers, vulnerability audits, architecture tests, contract drift checks, E2E and accessibility tests on every PR. These gates caught real AI mistakes: vulnerable package versions, lenient JSON number parsing, a deprecated .NET API.
+- **Tests are checked, not trusted:** AI-written tests are AI output too. The breakpoint and colour tests were proven by breaking the code on purpose and watching them fail.
+- **Honest about gaps:** what was verified, what was not, and what I would change next time are listed in the full account.
 - **Reviewed by a person:** I made the design decisions, built and tested every change on my machine, and can explain every line. I am accountable for everything committed under my name.
