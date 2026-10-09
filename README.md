@@ -148,7 +148,7 @@ All GitHub Actions are **pinned to commit SHAs**; Dependabot keeps actions, NuGe
 | [0001](docs/adr/0001-technology-choice.md)                     | React + TypeScript + Vite client                                                  |
 | [0002](docs/adr/0002-same-origin-api-proxy.md)                 | Browser only calls same-origin `/api` (served by our BFF)                         |
 | [0003](docs/adr/0003-runtime-validation.md)                    | Validate untrusted upstream data, skip bad records (in the BFF)                   |
-| [0004](docs/adr/0004-bff-api-contract.md)                      | API contract: filterable, paged books collection; no owner data; id assumption    |
+| [0004](docs/adr/0004-bff-api-contract.md)                      | API contract: filterable, paged books collection; no owner data; derived ids      |
 | [0005](docs/adr/0005-bff-clean-architecture.md)                | Three-project clean architecture; domain in Application, enforced by tests        |
 | [0006](docs/adr/0006-upstream-behaviour.md)                    | Upstream is rate-limited and intermittently returns empty bodies: retry and cache |
 | [0007](docs/adr/0007-edge-protection-and-cascading-failure.md) | Per-IP rate limit, security headers, bulkhead, circuit breaker, stale fallback    |
@@ -160,7 +160,7 @@ All GitHub Actions are **pinned to commit SHAs**; Dependabot keeps actions, NuGe
 
 - **Server and client.** The brief requires "a server side, to return data similar to the above, and a client side, to fetch the data from your server". We read "data similar to the above" as the grouped output: `GET /api/v1/books?ageCategory=…` returns one heading's books, already filtered and sorted.
 - **Upstream:** `GET https://digitalcodingtest.bupa.com.au/api/v1/bookowners`, unauthenticated, returning `[{ name, age, books: [{ name, type }] }]`. Its Swagger document declares no response schema, so the server validates every record.
-- **Identifiers.** The brief says the data is _"similar to"_ the structure shown, so we assume production data carries stable ids. The test endpoint sends none, so the server derives deterministic ids. Clients treat `id` as opaque.
+- **Identifiers.** The upstream data has no ids (confirmed by the live data, Swagger and the reference screenshots). The server derives a deterministic id per owned copy, for list keys, sorting tie-breaks and paging. Clients treat `id` as opaque.
 - **Access:** the book list is public, read-only data, so no sign-in. Owner names and ages are still treated as personal information and never leave the server.
 
 **Business rules**

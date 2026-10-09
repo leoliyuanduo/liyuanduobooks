@@ -36,9 +36,11 @@ GET /api/v1/books?ageCategory=adult|child   (required)
 - **Errors:** RFC 9457 `application/problem+json` with `traceId`. `400` validation (all errors at once), `502` upstream error or invalid payload, `503` + `Retry-After` circuit open, `504` upstream timeout.
 - **Versioning:** URL segment `/v1`. Additive changes (new optional fields or parameters) stay in v1.
 
-## Assumption: identifiers
+## Identifiers
 
-The brief describes the data as _"similar to"_ the structure shown, so we assume the production API exposes stable ids for owners and books. The test endpoint (verified 6 Oct 2026) returns none. The anti-corruption layer therefore accepts optional upstream ids (string or number) and, when absent, derives a deterministic id from the record's content and position. Derived ids are stable only while the upstream data is unchanged. Clients must treat `id` as an opaque string.
+The upstream data has **no identifiers**. This is confirmed by the live data, the Swagger page and the reference screenshots on the challenge page. Each owned copy still needs a stable id: React list keys, the sort tie-break, and deterministic paging. So the BFF **derives** one from the record's content and position (a SHA-256 hash). Ids are stable while the upstream data is unchanged. Clients must treat `id` as an opaque string.
+
+_Revised 9 Oct 2026._ The first version of the brief (a PDF, with no Swagger link or screenshots) described the data as _"similar to"_ the structure shown, so we initially assumed production data might carry ids, and accepted optional upstream ids. Once the live challenge page added Swagger and screenshots, the evidence said otherwise. We dropped the assumption and removed the code that supported it.
 
 ## Consequences
 
