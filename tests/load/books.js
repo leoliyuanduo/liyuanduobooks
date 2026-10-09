@@ -1,9 +1,9 @@
 // k6 load test for the BFF (https://grafana.com/docs/k6/).
-// Runs against the real image with a stubbed upstream (compose.e2e.yaml), so it measures
+// Runs against the real image with a stubbed upstream (tests/compose.e2e.yaml), so it measures
 // OUR service: caching, serialisation, middleware. Not the Bupa API's rate limit.
 //
-//   E2E_RATE_LIMIT=1000000 docker compose -f compose.yaml -f compose.e2e.yaml up --build -d
-//   k6 run load/books.js                      (BASE_URL defaults to http://localhost:8080)
+//   E2E_RATE_LIMIT=1000000 docker compose -f compose.yaml -f tests/compose.e2e.yaml up --build -d
+//   k6 run tests/load/books.js                 (BASE_URL defaults to http://localhost:8080)
 import http from 'k6/http';
 import { check, sleep } from 'k6';
 

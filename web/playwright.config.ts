@@ -2,7 +2,7 @@ import { defineConfig, devices } from '@playwright/test';
 
 /**
  * End-to-end tests run against the REAL app image (BFF + React build), started with
- * the stubbed upstream:  docker compose -f compose.yaml -f compose.e2e.yaml up --build -d
+ * the stubbed upstream:  docker compose -f compose.yaml -f tests/compose.e2e.yaml up --build -d
  * Then:  npm run e2e   (or E2E_BASE_URL=https://… npm run e2e against a deployed environment)
  */
 const chromiumPath = process.env['PW_CHROMIUM_PATH'];

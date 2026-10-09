@@ -16,7 +16,7 @@ A React app with its own server. The **server** (an ASP.NET Core BFF) fetches th
    - Inbound protection is in [`Program.cs`](api/src/BupaBooks.Host/Program.cs).
 5. **One contract, two languages:** the server generates [`openapi/bupa-books.json`](api/src/BupaBooks.Host/openapi/bupa-books.json) at build time. The client generates [`schema.d.ts`](web/src/api/schema.d.ts) from it, and CI fails if either drifts.
 6. **Quality gates:** [what runs where](#quality-gates). Unit, integration, architecture, contract and end-to-end tests (with axe accessibility checks), plus scanning.
-7. **Delivery:** the [Dockerfile](Dockerfile), [workflows](.github/workflows), [Terraform](infra/terraform) and [k6 load test](load/books.js).
+7. **Delivery:** the [Dockerfile](Dockerfile), [workflows](.github/workflows), [Terraform](infra/terraform) and [k6 load test](tests/load/books.js).
 8. **Why it is built this way:** eight short [ADRs](#key-decisions).
 
 **Deliberately not built** (and why): see [Not built, and why](#not-built-and-why).
@@ -32,7 +32,7 @@ docker compose up --build        # http://localhost:8080
 The image is distroless (chiseled Ubuntu), runs as non-root on a read-only filesystem, and calls the real Bupa API. For a fully offline, deterministic stack (Bupa replaced by a stub serving the captured live data):
 
 ```bash
-docker compose -f compose.yaml -f compose.e2e.yaml up --build
+docker compose -f compose.yaml -f tests/compose.e2e.yaml up --build
 ```
 
 ### Local development
@@ -140,7 +140,7 @@ All GitHub Actions are **pinned to commit SHAs**; Dependabot keeps actions, NuGe
 - **Image:** multi-stage [Dockerfile](Dockerfile). Node builds the client, the .NET SDK publishes the server, and the runtime is `aspnet:10.0-noble-chiseled-extra` (distroless, non-root, with ICU for `en-AU` sorting).
 - **Pipeline** ([ADR-0008](docs/adr/0008-delivery-pipeline.md)): PR checks → on `main`, the image that passed E2E and scanning is pushed to GHCR, tagged by commit SHA, with provenance and an SBOM → [`deploy.yml`](.github/workflows/deploy.yml) applies Terraform to **Azure Container Apps** behind a manual approval, authenticated with **OIDC** (no stored cloud secrets), then smoke-tests the URL.
 - **Infrastructure:** [`infra/terraform`](infra/terraform), with least privilege (the deploy identity is Contributor on one resource group only). Setup and status are in [`infra/README.md`](infra/README.md).
-- **Load test:** [`load/books.js`](load/books.js) (k6, 50 virtual users) runs against the real image with a stubbed upstream; results are published to the job summary.
+- **Load test:** [`tests/load/books.js`](tests/load/books.js) (k6, 50 virtual users) runs against the real image with a stubbed upstream; results are published to the job summary.
 
 ## Power Platform
 

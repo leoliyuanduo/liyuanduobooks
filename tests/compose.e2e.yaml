@@ -1,12 +1,12 @@
 # Deterministic end-to-end environment: the real app image, with the Bupa API replaced by
 # a stub serving the captured live payload. E2E tests then test OUR system, not the
 # availability of a rate-limited third party.
-#   docker compose -f compose.yaml -f compose.e2e.yaml up --build -d
+#   docker compose -f compose.yaml -f tests/compose.e2e.yaml up --build -d
 services:
   upstream-stub:
     image: nginx:1.27-alpine
     volumes:
-      - ./docker/upstream-stub/nginx.conf:/etc/nginx/conf.d/default.conf:ro
+      - ./tests/upstream-stub/nginx.conf:/etc/nginx/conf.d/default.conf:ro
       - ./api/tests/TestData/bookowners.json:/data/bookowners.json:ro
 
   app:

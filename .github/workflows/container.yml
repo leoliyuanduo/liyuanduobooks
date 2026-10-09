@@ -4,10 +4,10 @@ name: Container
 # publishes it with provenance and an SBOM. The image tested is the image shipped.
 on:
   pull_request:
-    paths: ['api/**', 'web/**', 'docker/**', 'Dockerfile', '.dockerignore', 'compose*.yaml', '.github/workflows/container.yml']
+    paths: ['api/**', 'web/**', 'tests/compose.e2e.yaml', 'tests/upstream-stub/**', 'Dockerfile', '.dockerignore', 'compose*.yaml', '.github/workflows/container.yml']
   push:
     branches: [main]
-    paths: ['api/**', 'web/**', 'docker/**', 'Dockerfile', '.dockerignore', 'compose*.yaml', '.github/workflows/container.yml']
+    paths: ['api/**', 'web/**', 'tests/compose.e2e.yaml', 'tests/upstream-stub/**', 'Dockerfile', '.dockerignore', 'compose*.yaml', '.github/workflows/container.yml']
   workflow_dispatch:
 
 permissions:
@@ -18,7 +18,7 @@ concurrency:
   cancel-in-progress: true
 
 env:
-  COMPOSE: docker compose -f compose.yaml -f compose.e2e.yaml
+  COMPOSE: docker compose -f compose.yaml -f tests/compose.e2e.yaml
 
 jobs:
   build-test-scan:
