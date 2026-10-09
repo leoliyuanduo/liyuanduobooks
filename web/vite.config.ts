@@ -24,7 +24,7 @@ export default defineConfig(({ mode }) => {
       coverage: {
         provider: 'v8',
         include: ['src/**/*.{ts,tsx}'],
-        exclude: ['src/main.tsx', 'src/vite-env.d.ts', 'src/test/**'],
+        exclude: ['src/main.tsx', 'src/**/*.d.ts', 'src/test/**'], // .d.ts files are types only: nothing to cover
         thresholds: { lines: 90, functions: 90, branches: 85, statements: 90 },
       },
     },
