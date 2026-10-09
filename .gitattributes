@@ -1,0 +1,9 @@
+# Normalise line endings: LF in the repository and in working trees on every OS,
+# so Windows and Linux contributors (and Docker builds) see identical files.
+* text=auto eol=lf
+
+*.png binary
+*.jpg binary
+*.ico binary
+*.cmd text eol=crlf
+*.bat text eol=crlf
